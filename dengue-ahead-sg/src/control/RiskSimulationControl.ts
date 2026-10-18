@@ -17,6 +17,8 @@ import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import type { ScenarioAdjustment } from '../entity/ScenarioAdjustment.ts';
 import type { SimulationScenario } from '../entity/SimulationScenario.ts';
 import type { RiskAssessmentControl } from './RiskAssessmentControl.ts';
+import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
+
 
 // What recalculateScenario gives back to the boundary, so it can show the comparison
 export interface SimulationResult {
@@ -37,4 +39,20 @@ export class RiskSimulationControl {
     // TODO: adjustmentLevel must be a valid AdjustmentLevel
     throw new Error('Not implemented');
   }
+
+  
+  async recalculateScenario(_baseline: RiskAssessment,_adjustments: ScenarioAdjustment[],_snapshot: PublicDataSnapshot,): Promise<SimulationResult> {
+    // TODO: validate each adjustment
+    // TODO: get baseline inputs with riskAssessmentControl.collectInputs(baseline.subzoneId, snapshot)
+    // TODO: change the inputs based on each adjustment (decide how much DECREASE / INCREASE changes them)
+    // TODO: riskAssessmentControl.generateAssessment(..., { inputs, assessmentType: SIMULATED })
+    // TODO: build a SimulationScenario (isHypothetical = true, baselineAssessmentId, simulatedAssessmentId)
+    throw new Error('Not implemented');
+  }
+
+  async resetScenario(_scenario: SimulationScenario): Promise<SimulationScenario> {
+    // TODO: clear adjustments, remove simulatedAssessmentId, so only the baseline is left
+    throw new Error('Not implemented');
+  }
+
 }
