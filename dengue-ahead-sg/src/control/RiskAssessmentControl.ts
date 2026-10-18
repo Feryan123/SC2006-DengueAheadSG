@@ -6,7 +6,7 @@
  * - generateAssessment() — build a RiskAssessment for a planning subzone
  * - calculateRiskIndex() — risk index (0–100) = sum of the factor contributions
  * - determineRiskLevel() — map the risk index to a risk level (LOW < 50 ≤ MODERATE < 80 ≤ HIGH)
- *                          NOTE: This threshold is to be discussed again later, for constants lOW_THRESHOLD & HIGH_THREHSOLD
+ *                          NOTE: This threshold is to be discussed again later, for constants MODERATE_THRESHOLD & HIGH_THREHSOLD
  * - calculateContributions() — get factor scores from the scoring API and add explanations
  * - collectInputs() — helper (not in diagram): pull one subzone's raw inputs out of a PublicDataSnapshot
  *
@@ -26,8 +26,8 @@ import type { Decimal } from '../entity/types.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
 import type { RiskInputs, RiskScoringServiceBoundary } from '../services/RiskScoringServiceBoundary.ts';
 
-// Agreed constants
-export const HORIZON_DAYS = 14;         // how dar ahead the risk prediction looks
+// Constants, to be agreed upon
+export const HORIZON_DAYS = 14;         // how far ahead the risk prediction looks
 export const MODERATE_THRESHOLD = 50;   // below this is considered LOW
 export const HIGH_THRESHOLD = 80;       // equal or above this is considered HIGH
                                         // other is considered MODERATE

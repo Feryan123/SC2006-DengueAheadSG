@@ -49,3 +49,4 @@ export function SimulationBoundary(_props: SimulationBoundaryProps) {
     </section>
   );
 }
+export default SimulationBoundary
