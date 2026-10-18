@@ -11,4 +11,13 @@
  * Relationships: implements GeocodingMapServiceBoundary
  */
 
-export {};
+import type { GeocodingResult } from '../GeocodingMapServiceBoundary.ts'
+
+export class MockGeocodingMapService {
+    // geocodeLocation() - return fake coordinates for a few addresses/postal codes
+    public async geocodeLocation(queryText: string): Promise <GeocodingResult | null> {
+        // TODO: return fake [Longitude, Latitude] coordinates for test addresses/postal codes
+        void queryText
+        return null
+    }
+}
