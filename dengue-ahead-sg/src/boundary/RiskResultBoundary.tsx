@@ -8,4 +8,28 @@
  * Calls: LocationRiskControl
  */
 
-export {};
+import type { ReactNode } from "react"
+import type { DengueCluster } from "../entity/DengueCluster.ts"
+import type { PlanningSubzone } from "../entity/PlanningSubzone.ts"
+import type { RiskAssessment } from "../entity/RiskAssessment.ts"
+
+export interface RiskResultBoundaryProps {
+    subzone : PlanningSubzone
+    assessment : RiskAssessment
+    clusters? : DengueCluster[]
+    onSimulate? : (baselineAssessment: RiskAssessment) => void
+    onBack? : () => void
+}
+
+export function RiskResultBoundary(props: RiskResultBoundaryProps) {
+    // showAssessment() - display risk level, 14-day prediction, assessment time, data confidence, 
+    // factor contributions + explanations, cluster info, disclaimer, and "Simulate" button
+    const showAssessment = () : ReactNode => {
+        // TODO: Render RiskAssessment details and Simulate button
+        void props
+        return null
+    }
+    return <section>{showAssessment()}</section>
+}   
+
+export default RiskResultBoundary
