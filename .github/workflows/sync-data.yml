@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: '0 * * * *'      # every hour, UTC
   workflow_dispatch:         # manual "Run workflow" button
-  push:
-    branches:
-      - willy/data
       
 concurrency: sync-data       # never run two syncs at the same time
 
