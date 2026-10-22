@@ -29,7 +29,7 @@ jobs:
         env:
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
 
-      # Commit snapshot.json to the 'data' branch and push
+      # Commit snapshot.json to the 'data' branch and push 
       - name: Commit and push snapshot.json
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
