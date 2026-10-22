@@ -1,0 +1,41 @@
+name: Hourly data sync
+
+on:
+  schedule:
+    - cron: '0 * * * *'      # every hour, UTC
+  workflow_dispatch:         # manual "Run workflow" button
+
+concurrency: sync-data       # never run two syncs at the same time
+
+permissions:
+  contents: write            # needed to push to the data branch
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dengue-ahead-sg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npm run sync       # fetch → join → validate → write snapshot.json
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+
+      # Commit snapshot.json to the 'data' branch and push
+      - name: Commit and push snapshot.json
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: data
+          create_branch: true
+          # Note the folder prefix here so git-auto-commit finds it inside your subfolder
+          file_pattern: dengue-ahead-sg/snapshot.json
+          commit_message: "chore(data): auto-update dengue snapshot.json [skip ci]"
+          skip_ci: true

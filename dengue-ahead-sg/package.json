@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync": "node --env-file=.env scripts/sync-data.js"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
