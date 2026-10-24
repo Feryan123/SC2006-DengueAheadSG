@@ -44,3 +44,9 @@ describe('buildPopulationIndex', () => {
     expect(index.get('YISHUN CENTRAL')).toBe(0);
   });
 });
+
+describe('density', () => {
+  it('converts m² to km²', () => {
+    expect(density(1000, 500_000)).toBeCloseTo(2000);
+  });
+});
