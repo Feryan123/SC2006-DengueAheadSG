@@ -5,26 +5,22 @@ import { DataGovSgAdapter } from '../src/services/DataGovSgAdapter.ts';
 // 1. Static historical datasets (Downloaded ONCE and cached forever)
 const STATIC_DATASETS = [
     { key: "ds2020PopulationDensity", id: "d_d95ae740c0f8961a0b10435836660ce0" },
-    { key: "ds2024Temperature", id: "d_910c81fce47f38574015b3882ac59254" },
-    { key: "ds2023Temperature", id: "d_370bbfc65de96ad93eaefa182135d1c0" },
-    { key: "ds2022Temperature", id: "d_6fd47a46bd59c5cb70d9561b404d0a64" },
-    { key: "ds2021Temperature", id: "d_557fbb859f12a8af29ef4e1375288165" },
-    { key: "ds2020Temperature", id: "d_10d453bc02d1a41daf6373b96b1929e4" },
-    { key: "ds2024RelativeHumidity", id: "d_7916c4c0cbe0dfaadaeac4b56d732a2a" },
-    { key: "ds2023RelativeHumidity", id: "d_d6fb7c8f42cacf73af76d17518c39f24" },
-    { key: "ds2022RelativeHumidity", id: "d_6ecc4ed07e7dcc024c22e548aa1e86f6" },
-    { key: "ds2021RelativeHumidity", id: "d_b30e532f095592dfa8fef924c2325b38" },
-    { key: "ds2020RelativeHumidity", id: "d_15f4385609fa3aa8f5812872586cbb80" },
-    { key: "ds2024Rainfall", id: "d_a0b69d3e02576a1fd0ab673e71f83507" }
+    { key: "subzonesBoundary", id: "d_8594ae9ff96d0c708bc2af633048edfb" }
 ];
 
-// 2. Dynamic Poll-Download Datasets (REFRESHED EVERY TIME your script runs)
-const DYNAMIC_DATASET_IDS: Record<string, string> = {
+// 2. Dynamic Poll-Download Datasets (GeoJSON spatial bundles)
+const POLL_DOWNLOAD_DATASETS: Record<string, string> = {
     dengueClusters: "d_dbfabf16158d1b0e1c420627c0819168",
     highAedesAreas: "d_5d060d8b7838a15e8906fb22c50dbf51"
 };
 
-// 3. Real-time weather API endpoints (REFRESHED EVERY TIME)
+// 3. Dynamic Datastore / CSV Datasets (Monthly tabular statistics)
+const DATASTORE_DATASETS: Record<string, string> = {
+    rainfallMonthly: "d_b16d06b83473fdfcc92ed9d37b66ba58",
+    relativeHumidityMonthly: "d_e3b1111a26b2aefef4f386c068d4ca5d"
+};
+
+// 4. Real-time weather API endpoints (REFRESHED EVERY TIME)
 const REALTIME_ENDPOINTS: string[] = [
     "airTemperature",
     "rainfall",
@@ -52,19 +48,33 @@ async function syncAllData(): Promise<void> {
             if (fs.existsSync(filePath)) {
                 console.log(`[Static] Using cached file: ${item.key}.json`);
             } else {
-                console.log(`[Static] Downloading new historical dataset: ${item.key}...`);
-                await adapter.fetchPollDownloadToDisk(item.id, filePath);
+                console.log(`[Static] Downloading static dataset: ${item.key}...`);
+                if (item.key === "subzonesBoundary") {
+                    await adapter.fetchPollDownloadToDisk(item.id, filePath);
+                } else {
+                    await adapter.fetchDatastoreRecords(item.id, filePath);
+                }
             }
             staticManifest[item.key] = path.relative(process.cwd(), filePath);
         }
         results.staticData = staticManifest;
 
-        // B. Handle Dynamic Datasets (Always downloads fresh data on every run)
+        // B. Handle Dynamic Datasets
         const dynamicManifest: Record<string, string> = {};
-        for (const [key, datasetId] of Object.entries(DYNAMIC_DATASET_IDS)) {
+
+        // B1. Poll-Download streams
+        for (const [key, datasetId] of Object.entries(POLL_DOWNLOAD_DATASETS)) {
             const filePath = path.join(dynamicDir, `${key}.json`);
-            console.log(`[Dynamic] Fetching latest live data for: ${key}...`);
+            console.log(`[Dynamic Poll] Fetching latest live data for: ${key}...`);
             await adapter.fetchPollDownloadToDisk(datasetId, filePath);
+            dynamicManifest[key] = path.relative(process.cwd(), filePath);
+        }
+
+        // B2. Datastore search queries (Rainfall & Humidity)
+        for (const [key, datasetId] of Object.entries(DATASTORE_DATASETS)) {
+            const filePath = path.join(dynamicDir, `${key}.json`);
+            console.log(`[Dynamic Datastore] Fetching records for: ${key}...`);
+            await adapter.fetchDatastoreRecords(datasetId, filePath);
             dynamicManifest[key] = path.relative(process.cwd(), filePath);
         }
         results.dynamicData = dynamicManifest;
@@ -86,7 +96,7 @@ async function syncAllData(): Promise<void> {
         const outputPath = path.join(process.cwd(), 'snapshot.json');
         fs.writeFileSync(outputPath, JSON.stringify(combinedSnapshot, null, 4));
         
-        console.log("Successfully completed data sync! Static files are cached, dynamic feeds are updated.");
+        console.log("Successfully completed data sync! Static files cached, dynamic poll & datastore tables updated.");
 
     } catch (error: any) {
         console.error("Error during data sync:", error.message);

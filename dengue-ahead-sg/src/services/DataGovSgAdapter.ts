@@ -86,4 +86,17 @@ export class DataGovSgAdapter {
     public async fetchDatastoreSearch(resourceId: string, outputPath: string): Promise<void> {
         return await this.fetchPollDownloadToDisk(resourceId, outputPath);
     }
+
+    // 3. Datastore Search / CSV Fetcher (For tabular datasets)
+    public async fetchDatastoreRecords(resourceId: string, outputPath: string, limit: number = 50000): Promise<void> {
+        const searchUrl = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&limit=${limit}`;
+        
+        const res = await fetch(searchUrl, { headers: this.getHeaders() });
+        if (!res.ok) {
+            throw new Error(`Failed to fetch datastore records for ${resourceId}: HTTP ${res.status}`);
+        }
+
+        const json = await res.json();
+        fs.writeFileSync(outputPath, JSON.stringify(json, null, 4));
+    }
 }
