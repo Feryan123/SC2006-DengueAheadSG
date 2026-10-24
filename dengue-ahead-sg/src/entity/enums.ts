@@ -53,10 +53,11 @@ export const AssessmentType = {
 export type AssessmentType = (typeof AssessmentType)[keyof typeof AssessmentType];
 
 export const RiskFactorType = {
-  Rainfall: 'RAINFALL',
-  PopulationDensity: 'POPULATION_DENSITY',
-  DengueCluster: 'DENGUE_CLUSTER',
+  DengueClusters: 'DENGUE_CLUSTERS',
   HighAedesArea: 'HIGH_AEDES_AREA',
+  PopulationDensity: 'POPULATION_DENSITY',
+  Humidity: 'HUMIDITY',
+  LaggedRainfall: 'LAGGED_RAINFALL',
 } as const;
 export type RiskFactorType = (typeof RiskFactorType)[keyof typeof RiskFactorType];
 
@@ -68,9 +69,9 @@ export const ContributionLevel = {
 export type ContributionLevel = (typeof ContributionLevel)[keyof typeof ContributionLevel];
 
 export const AdjustableRiskFactorType = {
-  Rainfall: 'RAINFALL',
-  DengueCluster: 'DENGUE_CLUSTER',
-  HighAedesArea: 'HIGH_AEDES_AREA',
+  LaggedRainfall: RiskFactorType.LaggedRainfall,
+  Humidity: RiskFactorType.Humidity,
+  HighAedesArea: RiskFactorType.HighAedesArea,
 } as const;
 export type AdjustableRiskFactorType = (typeof AdjustableRiskFactorType)[keyof typeof AdjustableRiskFactorType];
 
@@ -85,5 +86,13 @@ export const RiskLevel = {
   Low: 'LOW',
   Moderate: 'MODERATE',
   High: 'HIGH',
+  VeryHigh: 'VERY_HIGH',
 } as const;
 export type RiskLevel = (typeof RiskLevel)[keyof typeof RiskLevel];
+
+export const DatasetStatus = { 
+  Fresh: 'FRESH', 
+  Stale: 'STALE', 
+  Failed: 'FAILED' 
+} as const;
+export type DatasetStatus = (typeof DatasetStatus)[keyof typeof DatasetStatus];

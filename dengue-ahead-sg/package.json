@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "sync": "tsx --env-file-if-exists=.env scripts/sync-data.ts",
-    "build-static": "tsx scripts/build-static.ts",
-    "test": "vitest run"
+    "build-static": "tsx scripts/build-static.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

@@ -20,4 +20,7 @@ export interface PlanningSubzone {
   subzoneId: string;
   name: string;
   boundary: Geometry;
+  clusterCasesNearby: number;
+  residentsPerKm2: number;
+  aedesOverlapRatio: number;
 }

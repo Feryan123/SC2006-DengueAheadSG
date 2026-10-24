@@ -41,7 +41,7 @@ export function SimulationBoundary(_props: SimulationBoundaryProps) {
     <section>
       <h2>Simulate risk</h2>
       {/* TODO: one control per AdjustableRiskFactorType (Decrease / No change / Increase) */}
-      <button onClick={() => adjustFactor(AdjustableRiskFactorType.Rainfall, AdjustmentLevel.Decrease)}>
+      <button onClick={() => adjustFactor(AdjustableRiskFactorType.LaggedRainfall, AdjustmentLevel.Decrease)}>
         Less rain (placeholder)
       </button>
       <button onClick={resetScenario}>Reset to baseline</button>
