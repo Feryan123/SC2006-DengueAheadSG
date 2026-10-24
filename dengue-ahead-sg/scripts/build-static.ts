@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { computeMonthlyBaselines } from './lib/baselines.ts';
+import { buildPopulationIndex, density, normaliseName } from './lib/census.ts';
 
 const DYNAMIC_DIR = path.join(process.cwd(), 'data', 'dynamic');
 const OUT_DIR = path.join(process.cwd(), 'data', 'derived');
@@ -35,3 +36,45 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const outPath = path.join(OUT_DIR, 'weatherBaselines.json');
 fs.writeFileSync(outPath, JSON.stringify(baselines, null, 2));
 console.log(`Wrote ${outPath}`);
+
+const STATIC_DIR = path.join(process.cwd(), 'data', 'static');
+
+interface BoundaryFeature {
+  properties: { SUBZONE_C: string; SUBZONE_N: string; PLN_AREA_N: string; 'SHAPE.AREA': number };
+  geometry: unknown;   // Polygon or MultiPolygon, passed through as-is
+}
+
+const censusRecords = JSON.parse(
+  fs.readFileSync(path.join(STATIC_DIR, 'ds2020PopulationDensity.json'), 'utf8'),
+).result.records;
+const boundaryFeatures: BoundaryFeature[] = JSON.parse(
+  fs.readFileSync(path.join(STATIC_DIR, 'subzonesBoundary.json'), 'utf8'),
+).features;
+
+const populationIndex = buildPopulationIndex(censusRecords);
+const unmatched: string[] = [];
+
+const subzones = boundaryFeatures.map((f) => {
+  const p = f.properties;
+  const residents = populationIndex.get(normaliseName(p.SUBZONE_N));
+  if (residents === undefined) {
+    unmatched.push(p.SUBZONE_N)
+  }
+  const areaM2 = p['SHAPE.AREA'];
+  return {
+    subzoneId: p.SUBZONE_C,
+    name: p.SUBZONE_N,
+    planningArea: p.PLN_AREA_N,
+    residentCount: residents ?? 0,
+    areaKm2: areaM2 / 1_000_000,
+    residentsPerKm2: density(residents ?? 0, areaM2),
+    boundary: f.geometry,
+  };
+});
+
+if (unmatched.length > 0) {
+  throw new Error(`'${unmatched.length}' boundary subzones has no census match: '${unmatched.join(', ')}`)
+}
+
+fs.writeFileSync(path.join(OUT_DIR, 'subzones.json'), JSON.stringify(subzones));
+console.log(`Wrote ${subzones.length} subzones`);
