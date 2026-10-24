@@ -1,12 +1,13 @@
-import { RiskFactorType } from "../entity/enums";
+import { RiskFactorType } from '../entity/enums.ts';
 
+export const SCORING_VERSION = '2.0.0';
 
 export const FACTOR_RANK: Record<RiskFactorType, number> = {
   [RiskFactorType.DengueClusters]: 1,
   [RiskFactorType.HighAedesArea]: 2,
   [RiskFactorType.PopulationDensity]: 3,
   [RiskFactorType.Humidity]: 4,
-  [RiskFactorType.LaggedRainfall]: 5.
+  [RiskFactorType.LaggedRainfall]: 5,
 };
 
 export const CORE_FACTORS: readonly RiskFactorType[] = [RiskFactorType.DengueClusters];

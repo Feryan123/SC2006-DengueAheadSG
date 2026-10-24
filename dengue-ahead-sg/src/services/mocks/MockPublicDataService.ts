@@ -10,17 +10,18 @@
  * Subzone IDs are the URA subzone names (SUBZONE_N); the real service will
  * supply its own IDs, so nothing should hard-code these.
  *
- * Built to cover every case: HIGH (Tampines East, Yishun East), MODERATE
- * (Bedok North, Woodlands East), LOW (Ang Mo Kio Town Centre) and missing
- * rainfall data (Commonwealth → LOW data confidence).
+ * Subzone metrics and the national weather profile are PLACEHOLDERS in the
+ * new #4 shape; realistic values come later (#9).
  *
  * Relationships: implements ApprovedPublicDataServiceBoundary
  */
 
+import { DatasetStatus } from '../../entity/enums.ts';
 import type { DengueCluster } from '../../entity/DengueCluster.ts';
 import type { HighAedesArea } from '../../entity/HighAedesArea.ts';
 import type { PlanningSubzone } from '../../entity/PlanningSubzone.ts';
 import type { PopulationProfile } from '../../entity/PopulationProfile.ts';
+import type { WeatherProfile } from '../../entity/WeatherProfile.ts';
 import type { Geometry } from '../../entity/types.ts';
 import type { ApprovedPublicDataServiceBoundary, PublicDataSnapshot } from '../ApprovedPublicDataServiceBoundary.ts';
 
@@ -39,12 +40,18 @@ function box(lng: number, lat: number, half: number): Geometry {
 }
 
 const SUBZONES: PlanningSubzone[] = [
-  { subzoneId: 'TAMPINES EAST', name: 'Tampines East', boundary: box(103.955, 1.355, 0.008) },
-  { subzoneId: 'YISHUN EAST', name: 'Yishun East', boundary: box(103.840, 1.430, 0.007) },
-  { subzoneId: 'BEDOK NORTH', name: 'Bedok North', boundary: box(103.930, 1.330, 0.007) },
-  { subzoneId: 'WOODLANDS EAST', name: 'Woodlands East', boundary: box(103.795, 1.440, 0.007) },
-  { subzoneId: 'ANG MO KIO TOWN CENTRE', name: 'Ang Mo Kio Town Centre', boundary: box(103.848, 1.370, 0.005) },
-  { subzoneId: 'COMMONWEALTH', name: 'Commonwealth', boundary: box(103.800, 1.302, 0.005) },
+  { subzoneId: 'TAMPINES EAST', name: 'Tampines East', boundary: box(103.955, 1.355, 0.008),
+    clusterCasesNearby: 37, residentsPerKm2: 26000, aedesOverlapRatio: 0.3 },
+  { subzoneId: 'YISHUN EAST', name: 'Yishun East', boundary: box(103.840, 1.430, 0.007),
+    clusterCasesNearby: 44, residentsPerKm2: 22000, aedesOverlapRatio: 0.4 },
+  { subzoneId: 'BEDOK NORTH', name: 'Bedok North', boundary: box(103.930, 1.330, 0.007),
+    clusterCasesNearby: 9, residentsPerKm2: 20000, aedesOverlapRatio: 0.1 },
+  { subzoneId: 'WOODLANDS EAST', name: 'Woodlands East', boundary: box(103.795, 1.440, 0.007),
+    clusterCasesNearby: 15, residentsPerKm2: 18000, aedesOverlapRatio: 0.2 },
+  { subzoneId: 'ANG MO KIO TOWN CENTRE', name: 'Ang Mo Kio Town Centre', boundary: box(103.848, 1.370, 0.005),
+    clusterCasesNearby: 0, residentsPerKm2: 15000, aedesOverlapRatio: 0 },
+  { subzoneId: 'COMMONWEALTH', name: 'Commonwealth', boundary: box(103.800, 1.302, 0.005),
+    clusterCasesNearby: 3, residentsPerKm2: 24000, aedesOverlapRatio: 0 },
 ];
 
 const POPULATION_PROFILES: PopulationProfile[] = [
@@ -56,13 +63,16 @@ const POPULATION_PROFILES: PopulationProfile[] = [
   { subzoneId: 'COMMONWEALTH', residentCount: 21000, density: 24000, housingComposition: 'Mostly older HDB flats' },
 ];
 
-const RAINFALL_MM_BY_SUBZONE: Record<string, number> = {
-  'TAMPINES EAST': 240,
-  'YISHUN EAST': 210,
-  'BEDOK NORTH': 180,
-  'WOODLANDS EAST': 230,
-  'ANG MO KIO TOWN CENTRE': 120,
-  // COMMONWEALTH deliberately missing: tests the "data unavailable" path
+/** One national profile (D4). Placeholder numbers. */
+const WEATHER: WeatherProfile = {
+  humidityMonth: '2026-09',
+  meanHumidityPct: 82,
+  humidityNormalMean: 80,
+  humidityNormalSd: 3,
+  rainfallMonth: '2026-07',
+  rainfallMm: 180,
+  rainfallNormalMean: 160,
+  rainfallNormalSd: 50,
 };
 
 function buildSnapshot(retrievedAt: string): PublicDataSnapshot {
@@ -89,8 +99,15 @@ function buildSnapshot(retrievedAt: string): PublicDataSnapshot {
     populationProfiles: POPULATION_PROFILES,
     dengueClusters,
     highAedesAreas,
-    rainfallMmBySubzone: RAINFALL_MM_BY_SUBZONE,
-    retrievedAt,
+    weather: WEATHER,
+    generatedAt: retrievedAt,
+    datasets: {
+      dengueClusters: { retrievedAt, status: DatasetStatus.Fresh },
+      highAedesAreas: { retrievedAt, status: DatasetStatus.Fresh },
+      populationDensity: { retrievedAt, status: DatasetStatus.Fresh },
+      humidity: { retrievedAt, status: DatasetStatus.Fresh },
+      rainfall: { retrievedAt, status: DatasetStatus.Fresh },
+    },
   };
 }
 

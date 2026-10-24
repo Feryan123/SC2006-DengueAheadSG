@@ -28,7 +28,8 @@ export interface PublicDataSnapshot {
   populationProfiles: PopulationProfile[];
   dengueClusters: DengueCluster[];
   highAedesAreas: HighAedesArea[];
-  weather: WeatherProfile[]
+  /** One national monthly profile (Option A) */
+  weather: WeatherProfile;
 }
 
 export class ApprovedPublicDataServiceBoundary {
