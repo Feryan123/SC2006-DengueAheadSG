@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DataGovSgAdapter } from '../src/services/DataGovSgAdapter.ts';
+import { processSubzoneSpatialJoin } from '../src/services/turf.ts'; 
 
 // 1. Static historical datasets (Downloaded ONCE and cached forever)
 const STATIC_DATASETS = [
@@ -22,9 +23,9 @@ const DATASTORE_DATASETS: Record<string, string> = {
 
 // 4. Real-time weather API endpoints (REFRESHED EVERY TIME)
 const REALTIME_ENDPOINTS: string[] = [
-    //"airTemperature",
-    //"rainfall",
-    //"relativeHumidity"
+    // "airTemperature",
+    // "rainfall",
+    // "relativeHumidity"
 ];
 
 async function syncAllData(): Promise<void> {
@@ -36,9 +37,11 @@ async function syncAllData(): Promise<void> {
         // Ensure directories exist
         const staticDir = path.join(process.cwd(), 'data', 'static');
         const dynamicDir = path.join(process.cwd(), 'data', 'dynamic');
+        const derivedDir = path.join(process.cwd(), 'data', 'derived');
         
         if (!fs.existsSync(staticDir)) fs.mkdirSync(staticDir, { recursive: true });
         if (!fs.existsSync(dynamicDir)) fs.mkdirSync(dynamicDir, { recursive: true });
+        if (!fs.existsSync(derivedDir)) fs.mkdirSync(derivedDir, { recursive: true });
 
         // A. Handle Static Data (Idempotent: skips if file already exists)
         const staticManifest: Record<string, string> = {};
@@ -87,19 +90,93 @@ async function syncAllData(): Promise<void> {
         }
         results.realtime = realtimeResults;
 
-        // D. Write master snapshot manifest
-        const combinedSnapshot = {
+        // --- D. SPATIAL JOIN, FRESHNESS & VALIDATION (Ticket #12) ---
+        console.log("Processing spatial joins and generating subzone metrics...");
+
+        // 1. Read committed static/derived baseline files
+        const subzonesPath = path.join(derivedDir, 'subzones.json');
+        const weatherBaselinesPath = path.join(derivedDir, 'weatherBaselines.json');
+
+        if (!fs.existsSync(subzonesPath)) {
+            throw new Error("Missing required committed file: data/derived/subzones.json");
+        }
+        if (!fs.existsSync(weatherBaselinesPath)) {
+            throw new Error("Missing required committed file: data/derived/weatherBaselines.json");
+        }
+
+        const subzonesData = JSON.parse(fs.readFileSync(subzonesPath, 'utf8'));
+
+        // 2. Load newly fetched dynamic dengue data and safely normalize into { lat, lng } points
+        const dengueClustersPath = path.join(dynamicDir, 'dengueClusters.json');
+        const dengueFileContent = fs.existsSync(dengueClustersPath) 
+            ? JSON.parse(fs.readFileSync(dengueClustersPath, 'utf8')) 
+            : [];
+
+        let incidentPoints: Array<{ lat: number; lng: number }> = [];
+
+        if (Array.isArray(dengueFileContent)) {
+            // Case A: Already a flat array
+            incidentPoints = dengueFileContent;
+        } else if (dengueFileContent && Array.isArray(dengueFileContent.features)) {
+            // Case B: GeoJSON FeatureCollection format (extracting [lng, lat] from geometry)
+            incidentPoints = dengueFileContent.features.map((f: any) => {
+                const coords = f.geometry?.coordinates;
+                return {
+                    lng: coords?.[0],
+                    lat: coords?.[1]
+                };
+            }).filter((pt: any) => pt.lat != null && pt.lng != null);
+        } else if (dengueFileContent && Array.isArray(dengueFileContent.data)) {
+            // Case C: Wrapped in a .data property
+            incidentPoints = dengueFileContent.data;
+        }
+
+        // 3. Perform Turf.js spatial join using your normalized points helper
+        const subzoneMetrics = processSubzoneSpatialJoin(subzonesData, incidentPoints);
+
+        // 4. Track Dataset Status and Freshness (Stale if latest month is > 2 months old)
+        const rainfallMonthlyPath = path.join(dynamicDir, 'rainfallMonthly.json');
+        let rainfallStatus = 'fresh';
+        if (fs.existsSync(rainfallMonthlyPath)) {
+            const rainfallData = JSON.parse(fs.readFileSync(rainfallMonthlyPath, 'utf8'));
+            const latestRecord = rainfallData[rainfallData.length - 1];
+            const latestDate = new Date(latestRecord?.date || latestRecord?.yearMonth || Date.now());
+            const now = new Date();
+            const monthsElapsed = (now.getFullYear() - latestDate.getFullYear()) * 12 + (now.getMonth() - latestDate.getMonth());
+            if (monthsElapsed > 2) {
+                rainfallStatus = 'stale';
+            }
+        }
+
+        // 5. VALIDATION GUARD: Invalid data never overwrites the last good snapshot
+        if (!subzoneMetrics || !Array.isArray(subzoneMetrics) || subzoneMetrics.length === 0) {
+            throw new Error("Validation Error: Computed subzone metrics resulted in an empty array. Aborting to protect last good snapshot.");
+        }
+
+        // 6. Publish Final Validated Snapshot
+        const finalSnapshot = {
             lastUpdated: new Date().toISOString(),
-            ...results
+            datasetStatuses: {
+                rainfallMonthly: rainfallStatus,
+                weatherBaselines: "fresh",
+                dengueClusters: "fresh"
+            },
+            subzones: subzoneMetrics
         };
 
-        const outputPath = path.join(process.cwd(), 'snapshot.json');
-        fs.writeFileSync(outputPath, JSON.stringify(combinedSnapshot, null, 4));
-        
-        console.log("Successfully completed data sync! Static files cached, dynamic poll & datastore tables updated.");
+        const snapshotOutputPath = path.join(derivedDir, 'latest-snapshot.json');
+        fs.writeFileSync(snapshotOutputPath, JSON.stringify(finalSnapshot, null, 2));
+
+        // Also write master manifest for backward compatibility
+        const masterManifestPath = path.join(process.cwd(), 'snapshot.json');
+        fs.writeFileSync(masterManifestPath, JSON.stringify({ lastUpdated: new Date().toISOString(), ...results }, null, 4));
+
+        console.log("Successfully completed data sync, spatial join, validation, and snapshot publication!");
 
     } catch (error: any) {
         console.error("Error during data sync:", error.message);
+        // CRITICAL: Exit with non-zero exit code so the GitHub Action fails and 
+        // the previous 'latest-snapshot.json' file remains completely untouched.
         process.exit(1);
     }
 }
