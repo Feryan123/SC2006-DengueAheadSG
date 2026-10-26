@@ -22,9 +22,9 @@ const DATASTORE_DATASETS: Record<string, string> = {
 
 // 4. Real-time weather API endpoints (REFRESHED EVERY TIME)
 const REALTIME_ENDPOINTS: string[] = [
-    "airTemperature",
-    "rainfall",
-    "relativeHumidity"
+    //"airTemperature",
+    //"rainfall",
+    //"relativeHumidity"
 ];
 
 async function syncAllData(): Promise<void> {
