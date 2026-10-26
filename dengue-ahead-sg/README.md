@@ -126,6 +126,42 @@ uses a public snapshot URL and sends no API key. Private data-source credentials
 belong in the pipeline's server environment.
 
 Run its checks with `npm test -- --run src/services/CachedPublicDataServiceProxy.test.ts`.
+## Risk map
+
+Open **Risk Map** from the menu. Select a subzone by clicking its outline,
+searching its name or using the area list. Purple dashed lines mark subzones;
+the selected area has a solid bright pink outline.
+
+The legend shows four risk levels, from light blue (Low) to dark blue (Very High).
+Grey means no risk assessment is available; it does not mean Low risk. Map and
+result colours share `src/boundary/riskLevelStyle.ts`.
+
+Selecting an area opens a popup with its level, risk index and up to three main
+factors. **View full assessment** opens that area's result through the app's
+navigation callback. The **Top 10 subzones** list ranks assessed areas by risk
+index, highest first; select a list entry to find it on the map. Areas without
+assessments are left out of this list and their result action is disabled.
+
+Leaflet displays [OneMap tiles](https://www.onemap.gov.sg/docs/maps/index.html)
+with the required SLA attribution. Subzone outlines come from
+[URA's Master Plan 2019 dataset](https://data.gov.sg/datasets/d_8594ae9ff96d0c708bc2af633048edfb/view),
+available under the [Singapore Open Data Licence](https://data.gov.sg/open-data-licence).
+
+## App navigation
+
+`App` uses a `Screen` union for Home, Map, Result, Simulation, Prevention and
+unavailable-data screens. It stores the selected subzone and assessment from
+the screen callbacks. Opening a map result passes the assessment and snapshot
+already displayed on that map, without requesting another calculation.
+
+The start-up code can supply `locationControl`, `mapControl`, `preventionControl`
+and `simulationControl` as props. For home assessments, `publicSnapshot` must
+be the same snapshot used by the location control. Simulation keeps that original
+snapshot and baseline. Missing controls or data show an unavailable screen with
+working return actions. Home clears the previous assessment.
+
+Screen components own their forms and result content; `App` connects their
+callbacks and provides the shared navigation, data-source credits and disclaimer.
 
 ## Project structure
 

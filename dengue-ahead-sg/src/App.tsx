@@ -1,177 +1,252 @@
-//Code handles navigation and the shared page layout. Sample screens are PLACEHOLDERS until the real components are ready.
+// - Keep the selected area and assessment while moving between screens.
+// - Connect the real boundary components and handle unavailable data.
+// - Ticket 19: App navigation for UC-1 to UC-5.
 
 import { useState } from 'react';
+import HomePageBoundary from './boundary/HomePageBoundary.tsx';
 import RiskMapBoundary from './boundary/RiskMapBoundary.tsx';
+import RiskResultBoundary from './boundary/RiskResultBoundary.tsx';
+import SimulationBoundary from './boundary/SimulationBoundary.tsx';
+import PreventionGuidanceBoundary from './boundary/PreventionGuidanceBoundary.tsx';
+import DataUnavailableBoundary from './boundary/DataUnavailableBoundary.tsx';
+import { RiskMapControl, type MapAssessmentSelection } from './control/RiskMapControl.ts';
+import type { LocationRiskControl } from './control/LocationRiskControl.ts';
+import type { PreventionGuidanceControl } from './control/PreventionGuidanceControl.ts';
+import type { RiskSimulationControl } from './control/RiskSimulationControl.ts';
+import type { PlanningSubzone } from './entity/PlanningSubzone.ts';
+import type { RiskAssessment } from './entity/RiskAssessment.ts';
+import type { DengueCluster } from './entity/DengueCluster.ts';
+import type { PublicDataSnapshot } from './services/ApprovedPublicDataServiceBoundary.ts';
 
-export default function App() {
-  const [screen, setScreen] = useState('home');
-  const [selectedId, setSelectedId] = useState('');
-  const [query, setQuery] = useState('');
+export type Screen = 'home' | 'map' | 'result' | 'simulation' | 'prevention' | 'dataUnavailable';
 
-  // Open the result for the selected area.
-  function requestAssessment(subzoneId: string) {
-    setSelectedId(subzoneId);
-    // TODO: Get and save the real assessment and subzone for the Result screen.
-    // TODO: Pass the baseline assessment to SimulationBoundary.
-    // TODO: Show dataUnavailable if the assessment cannot be loaded.
+export type AppProps = {
+  locationControl?: LocationRiskControl;
+  mapControl?: RiskMapControl;
+  preventionControl?: PreventionGuidanceControl;
+  simulationControl?: RiskSimulationControl;
+  // Start-up must supply the same snapshot used by location assessment.
+  publicSnapshot?: PublicDataSnapshot;
+};
+
+const defaultMapControl = new RiskMapControl();
+
+export default function App(props: AppProps = {}) {
+  let mapControl = props.mapControl;
+  if (mapControl === undefined) {
+    mapControl = defaultMapControl;
+  }
+
+  const [screen, setScreen] = useState<Screen>('home');
+  const [subzone, setSubzone] = useState<PlanningSubzone | null>(null);
+  const [assessment, setAssessment] = useState<RiskAssessment | null>(null);
+  const [snapshot, setSnapshot] = useState<PublicDataSnapshot | null>(null);
+  const [resultOrigin, setResultOrigin] = useState<'home' | 'map'>('home');
+  const [unavailableTitle, setUnavailableTitle] = useState('Risk assessment unavailable');
+
+  function clearAssessment() {
+    setSubzone(null);
+    setAssessment(null);
+    setSnapshot(null);
+  }
+
+  function goHome() {
+    clearAssessment();
+    setScreen('home');
+  }
+
+  function openMap() {
+    setScreen('map');
+  }
+
+  function openPrevention() {
+    setScreen('prevention');
+  }
+
+  function returnToAssessment() {
     setScreen('result');
   }
 
-  // PLACEHOLDER: This only previews the error screens; it does not check addresses.
-  function checkLocation() {
-    setScreen(query.trim() ? 'dataUnavailable' : 'invalidLocation');
-    // TODO: Replace with LocationRiskControl.assessLocation() and handle its result.
+  function showDataUnavailable() {
+    clearAssessment();
+    setUnavailableTitle('Risk assessment unavailable');
+    setScreen('dataUnavailable');
+  }
+
+  function showAssessment(
+    selectedSubzone: PlanningSubzone,
+    selectedAssessment: RiskAssessment,
+    originalSnapshot: PublicDataSnapshot | undefined,
+    fromScreen: 'home' | 'map',
+  ) {
+    if (selectedAssessment.subzoneId !== selectedSubzone.subzoneId) {
+      showDataUnavailable();
+      return;
+    }
+    setSubzone(selectedSubzone);
+    setAssessment(selectedAssessment);
+
+    if (originalSnapshot === undefined) {
+      setSnapshot(null);
+    } else {
+      setSnapshot(originalSnapshot);
+    }
+
+    setResultOrigin(fromScreen);
+    setScreen('result');
+  }
+
+  function showHomeAssessment(selectedSubzone: PlanningSubzone, selectedAssessment: RiskAssessment) {
+    showAssessment(selectedSubzone, selectedAssessment, props.publicSnapshot, 'home');
+  }
+
+  function showMapAssessment(id: string, selection?: MapAssessmentSelection) {
+    if (!selection || selection.subzone.subzoneId !== id) {
+      showDataUnavailable();
+      return;
+    }
+    showAssessment(selection.subzone, selection.assessment, selection.snapshot, 'map');
+  }
+
+  function openSimulation() {
+    if (!assessment || !snapshot || !props.simulationControl) {
+      setUnavailableTitle('Simulation unavailable');
+      setScreen('dataUnavailable');
+      return;
+    }
+    setScreen('simulation');
   }
 
   function showScreen() {
     switch (screen) {
       case 'home':
-      case 'invalidLocation':
-        // PLACEHOLDER: Replace with HomePageBoundary when ready.
+        if (!props.locationControl) {
+          return <DataUnavailableBoundary title="Location search unavailable" onOpenMap={openMap} />;
+        }
         return (
-          <>
-            <div className="hero-grid">
-              <div>
-                <h1>Check dengue risk for a<br />Singapore location</h1>
-                <p className="muted">Enter a Singapore address or postal code to see its Planning Subzone, Early-Warning Risk Level and contributing factors.</p>
-                <div className="search-row">
-                  <input aria-label="Singapore address or postal code" placeholder="Enter Singapore address or postal code" value={query} onChange={(event) => setQuery(event.target.value)} />
-                  <button className="primary" onClick={checkLocation}>Check Risk</button>
-                </div>
-                {screen === 'invalidLocation' ? (
-                  <p className="error-text">PLACEHOLDER: Enter a valid Singapore address or postal code.</p>
-                ) : (
-                  <p className="hint">Enter a Singapore address or postal code</p>
-                )}
-              </div>
-              {screen === 'invalidLocation' ? (
-                <div className="card hero-card">
-                  <p className="eyebrow">Location not recognised</p>
-                  <h2 className="error-text">Outside Singapore</h2>
-                  <p className="muted">PLACEHOLDER: Location validation has not been connected yet.</p>
-                </div>
-              ) : (
-                <div className="card hero-card">
-                  <p className="eyebrow">What you'll receive</p>
-                  <h2 className="teal-text">14-day</h2>
-                  <p>14-day assessment prediction</p>
-                  <p className="muted small">Risk Level • Data Confidence • Assessment time</p>
-                </div>
-              )}
-            </div>
-            <h3 className="section-heading">What you can do</h3>
-            <div className="feature-grid">
-              <div className="card feature-card">
-                <h3>Check location risk</h3>
-                <p>Enter an address or postal code to see the Risk Level for its Planning Subzone.</p>
-              </div>
-              <button className="card feature-card card-button" onClick={() => setScreen('map')}>
-                <strong>Explore Singapore Risk Map</strong>
-                <span>Search Planning Subzones and review risk bands, confirmed clusters and high-Aedes areas.</span>
-              </button>
-              <button className="card feature-card card-button" onClick={() => setScreen('prevention')}>
-                <strong>View prevention guidance</strong>
-                <span>Read practical steps for reducing mosquito breeding and protecting yourself.</span>
-              </button>
-            </div>
-          </>
+          <HomePageBoundary
+            control={props.locationControl}
+            onAssessmentReady={showHomeAssessment}
+            onDataUnavailable={showDataUnavailable}
+            onOpenMap={openMap}
+            onOpenPrevention={openPrevention}
+          />
         );
 
       case 'map':
-        return <RiskMapBoundary onRequestAssessment={requestAssessment} />;
+        return <RiskMapBoundary control={mapControl} onRequestAssessment={showMapAssessment} />;
 
-      case 'result':
-        // PLACEHOLDER: Replace with RiskResultBoundary and pass real assessment data.
+      case 'result': {
+        if (!subzone || !assessment) {
+          return <DataUnavailableBoundary title="Risk assessment unavailable" onHome={goHome} />;
+        }
+
+        let clusters: DengueCluster[] | undefined;
+        if (snapshot) {
+          clusters = [];
+          for (const cluster of snapshot.dengueClusters) {
+            if (cluster.subzoneId === subzone.subzoneId) {
+              clusters.push(cluster);
+            }
+          }
+        }
+
         return (
-          <>
-            <p className="eyebrow teal-text">Design preview • Not a real risk assessment</p>
-            <h1>{selectedId || 'Tampines East'}</h1>
-            <p className="muted">Planning Subzone • 14-day assessment prediction</p>
-            <div className="notice">PLACEHOLDER: Risk data and confidence have not been calculated.</div>
-            <div className="result-grid">
-              <div className="card result-card">
-                <p className="eyebrow">Early-Warning Risk Level</p>
-                <h2>—</h2>
-                <span className="pill">Confidence unavailable</span>
-                <p className="muted">The real Risk Level will appear after the assessment is connected.</p>
-              </div>
-              <div className="card result-card">
-                <h3>Risk Factors and contributions</h3>
-                {['Recent rainfall', 'High-Aedes pressure', 'National dengue trend', 'Population exposure'].map((factor) => (
-                  <div className="factor-row" key={factor}>
-                    <span>{factor}</span><div className="empty-bar" /><small>Pending</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="card cluster-card"><h3>Confirmed dengue cluster context</h3><p className="muted">PLACEHOLDER: Cluster information is not connected yet.</p></div>
-            <div className="actions">
-              <button className="secondary" onClick={() => setScreen('home')}>Check another location</button>
-              <button className="primary" onClick={() => setScreen('map')}>Open Risk Map</button>
-            </div>
-          </>
+          <RiskResultBoundary
+            subzone={subzone}
+            assessment={assessment}
+            clusters={clusters}
+            onSimulate={openSimulation}
+            onBack={() => setScreen(resultOrigin)}
+          />
+        );
+      }
+
+      case 'simulation':
+        if (!assessment || !snapshot || !props.simulationControl) {
+          return <DataUnavailableBoundary title="Simulation unavailable" onHome={goHome} />;
+        }
+        return (
+          <section>
+            <button className="secondary" onClick={returnToAssessment}>Back to assessment</button>
+            <SimulationBoundary baseline={assessment} snapshot={snapshot} simulationControl={props.simulationControl} />
+          </section>
         );
 
       case 'prevention':
-        // PLACEHOLDER: Replace with PreventionGuidanceBoundary and official content.
-        return (
-          <>
-            <h1>Prevention Guidance</h1>
-            <p className="muted">Read practical dengue-prevention actions for any Singapore household.</p>
-            <div className="prevention-grid">
-              <div className="card advice"><span className="advice-icon">💧</span><div><h3>Remove stagnant water</h3><p>Empty, scrub and overturn containers that can collect water.</p></div></div>
-              <div className="card advice"><span className="advice-icon">◈</span><div><h3>Use mosquito repellent</h3><p>Follow the product label, especially during peak biting times.</p></div></div>
-              <div className="card advice"><span className="advice-icon">▦</span><div><h3>Maintain window screens</h3><p>Repair gaps in screens and keep mosquitoes out.</p></div></div>
-              <div className="card advice"><span className="advice-icon">♙</span><div><h3>Wear protective clothing</h3><p>Choose long sleeves and long trousers where appropriate.</p></div></div>
-              <div className="card advice"><span className="advice-icon">✚</span><div><h3>Seek medical attention</h3><p>Consult a doctor if you develop dengue-like symptoms.</p></div></div>
-            </div>
-            <div className="card guidance-note"><strong>Public prevention guidance</strong><p className="muted">PLACEHOLDER: Replace sample advice with approved checklist content and source links.</p></div>
-          </>
-        );
+        if (!props.preventionControl) {
+          return <DataUnavailableBoundary title="Prevention guidance unavailable" onHome={goHome} onOpenMap={openMap} />;
+        }
+        return <PreventionGuidanceBoundary control={props.preventionControl} onBack={goHome} />;
 
       case 'dataUnavailable':
-        // PLACEHOLDER: The real screen will explain which required data failed.
+        if (subzone && assessment) {
+          return (
+            <DataUnavailableBoundary
+              title={unavailableTitle}
+              onHome={goHome}
+              onOpenMap={openMap}
+              onReturnToAssessment={returnToAssessment}
+            />
+          );
+        }
         return (
-          <>
-            <p className="eyebrow teal-text">Risk assessment</p>
-            <h1>Risk Assessment unavailable</h1>
-            <p className="muted">The required public data is not available yet.</p>
-            <div className="notice">PLACEHOLDER: Required data sources have not been connected.</div>
-            <div className="card unavailable-card">
-              <h3>We can't generate a current Risk Assessment</h3>
-              <p className="muted">No risk level has been produced. You can return Home or open the Risk Map.</p>
-              <span className="pill">Confidence: Unavailable</span>
-            </div>
-            <div className="actions centered">
-              <button className="secondary" onClick={() => setScreen('home')}>Return Home</button>
-              <button className="primary" onClick={() => setScreen('map')}>Open Risk Map</button>
-            </div>
-          </>
+          <DataUnavailableBoundary
+            title={unavailableTitle}
+            onHome={goHome}
+            onOpenMap={openMap}
+          />
         );
-
-      case 'simulation':
-        // PLACEHOLDER: Import SimulationBoundary and pass the baseline assessment.
-        return <div className="card result-card"><h1>Simulation</h1><p className="muted">PLACEHOLDER: Simulation screen is not connected yet.</p></div>;
-
-      default:
-        return <p>Page not found.</p>;
     }
   }
+
+  const homeActive = screen !== 'map' && screen !== 'prevention';
+  const mapActive = screen === 'map';
+  const preventionActive = screen === 'prevention';
 
   return (
     <div className="app-shell">
       <header className="site-header">
         <div className="header-inner">
-          <button className="brand" onClick={() => setScreen('home')}><span className="brand-mark">D</span>DengueAhead SG</button>
+          <button className="brand" aria-label="DengueAhead SG home" onClick={goHome}>
+            <span className="brand-mark" aria-hidden="true">D</span>
+            DengueAhead SG
+          </button>
           <nav className="main-nav" aria-label="Main navigation">
-            <button className={screen === 'home' || screen === 'invalidLocation' || screen === 'dataUnavailable' || screen === 'result' ? 'active' : ''} onClick={() => setScreen('home')}>Home</button>
-            <button className={screen === 'map' ? 'active' : ''} onClick={() => setScreen('map')}>Risk Map</button>
-            <button className={screen === 'prevention' ? 'active' : ''} onClick={() => setScreen('prevention')}>Prevention Guidance</button>
+            <button
+              className={homeActive ? 'active' : ''}
+              aria-current={homeActive ? 'page' : undefined}
+              onClick={goHome}
+            >
+              Home
+            </button>
+            <button
+              className={mapActive ? 'active' : ''}
+              aria-current={mapActive ? 'page' : undefined}
+              onClick={openMap}
+            >
+              Risk Map
+            </button>
+            <button
+              className={preventionActive ? 'active' : ''}
+              aria-current={preventionActive ? 'page' : undefined}
+              onClick={openPrevention}
+            >
+              Prevention Guidance
+            </button>
           </nav>
         </div>
       </header>
       <main className="site-main">{showScreen()}</main>
-      <footer className="site-footer">Not an official NEA forecast or medical advice.</footer>
+      <footer className="site-footer">
+        <p>
+          Map: <a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a>
+          {' '}(<a href="https://www.sla.gov.sg/" target="_blank" rel="noopener noreferrer">SLA</a>).
+          {' '}Data: <a href="https://data.gov.sg/" target="_blank" rel="noopener noreferrer">data.gov.sg</a>
+          {' '}under the <a href="https://data.gov.sg/open-data-licence" target="_blank" rel="noopener noreferrer">Singapore Open Data Licence</a>.
+        </p>
+        <p>Not an official NEA forecast or medical advice.</p>
+      </footer>
     </div>
   );
 }

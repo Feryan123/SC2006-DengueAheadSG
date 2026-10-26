@@ -19,6 +19,8 @@ export const MAX_MONTHLY_LAG_MONTHS = 2;
 export const RISK_BANDS = { moderateFrom: 25, highFrom: 50, veryHighFrom: 75 } as const;  // 4 levels
 export const CONTRIBUTION_BANDS = { moderateFrom: 34, highFrom: 67 } as const;           // stays 3 levels
 
+export const Z_CAP = 2;
+
 export function rankSumWeights(
   rank: Record<RiskFactorType, number>,
 ): Record<RiskFactorType, number> { 

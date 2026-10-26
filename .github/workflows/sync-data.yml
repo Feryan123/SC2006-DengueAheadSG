@@ -1,0 +1,57 @@
+name: Hourly data sync
+
+on:
+  schedule:
+    - cron: '0 * * * *'      # every hour, UTC
+  workflow_dispatch:         # manual "Run workflow" button
+      
+concurrency: sync-data       # never run two syncs at the same time
+
+permissions:
+  contents: write            # needed to push to the data branch
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dengue-ahead-sg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: dengue-ahead-sg/package-lock.json
+
+      - name: Get current date for daily cache key
+        id: date
+        run: echo "CURRENT_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: Cache dynamic monthly datasets
+        id: dynamic-cache
+        uses: actions/cache@v4
+        with:
+          path: dengue-ahead-sg/data/dynamic
+          key: dynamic-monthly-datasets-${{ runner.os }}-${{ env.CURRENT_DATE }}
+          restore-keys: |
+            dynamic-monthly-datasets-${{ runner.os }}-
+
+      - run: npm ci
+
+      - run: npm run sync       # fetch → join → validate → write snapshot.json
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          CACHE_HIT: ${{ steps.dynamic-cache.outputs.cache-hit }}
+
+      # Commit snapshot and derived metrics to the 'data' branch and push 
+      - name: Commit and push snapshots
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          push_options: '--force'
+          branch: data
+          create_branch: true
+          file_pattern: 'dengue-ahead-sg/snapshot.json dengue-ahead-sg/data/derived/latest-snapshot.json'
+          commit_message: "chore(data): auto-update dengue snapshot and metrics [skip ci]"
+          skip_ci: true
