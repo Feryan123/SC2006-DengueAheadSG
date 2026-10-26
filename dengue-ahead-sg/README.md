@@ -98,6 +98,21 @@ Official references: [authentication](https://www.onemap.gov.sg/apidocs/authenti
 [token errors](https://www.onemap.gov.sg/apidocs/docs/verifyingsearchapitoken),
 and [Vercel Node.js functions](https://vercel.com/docs/functions/runtimes/node-js).
 
+## Risk map
+
+Open **Risk Map** from the menu. Select a subzone by clicking its outline,
+searching its name or using the area list. Purple dashed lines mark subzones;
+the selected area has a solid bright pink outline.
+
+The legend shows four risk levels, from light blue (Low) to dark blue (Very High).
+Grey means no risk assessment is available; it does not mean Low risk. Map and
+result colours share `src/boundary/riskLevelStyle.ts`.
+
+Leaflet displays [OneMap tiles](https://www.onemap.gov.sg/docs/maps/index.html)
+with the required SLA attribution. Subzone outlines come from
+[URA's Master Plan 2019 dataset](https://data.gov.sg/datasets/d_8594ae9ff96d0c708bc2af633048edfb/view),
+available under the [Singapore Open Data Licence](https://data.gov.sg/open-data-licence).
+
 ## Project structure
 
 The code follows the **Entity–Control–Boundary** pattern from our class diagram. Every class in the diagram has exactly one file, and each file starts with a header comment saying which class and use case it traces to and what is left to implement.
