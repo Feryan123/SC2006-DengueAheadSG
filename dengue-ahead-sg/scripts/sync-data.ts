@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 import { DataGovSgAdapter } from '../src/services/DataGovSgAdapter.ts';
 import { processSubzoneSpatialJoin } from '../src/services/turf.ts'; 
 
@@ -22,18 +21,17 @@ const DATASTORE_DATASETS: Record<string, string> = {
     relativeHumidityMonthly: "d_e3b1111a26b2aefef4f386c068d4ca5d"
 };
 
-// 4. Real-time weather API endpoints (REFRESHED EVERY TIME)
 const REALTIME_ENDPOINTS: string[] = [];
 
 /**
- * Helper to check how many hours ago a file was last modified and committed in git.
+ * Helper to check file age in hours using file modification time (mtime)
+ * since dynamic/uncommitted files won't exist in git history.
  */
 function getFileAgeInHours(filePath: string): number {
     try {
-        const timestampStr = execSync(`git log -1 --format=%ct -- "${filePath}"`, { encoding: 'utf8' }).trim();
-        if (!timestampStr) return 999; 
-        const commitTimeMs = parseInt(timestampStr, 10) * 1000;
-        return (Date.now() - commitTimeMs) / (1000 * 60 * 60);
+        if (!fs.existsSync(filePath)) return 999;
+        const stats = fs.statSync(filePath);
+        return (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
     } catch {
         return 999; 
     }
@@ -98,15 +96,19 @@ async function syncAllData(): Promise<void> {
             dynamicManifest[key] = path.relative(process.cwd(), filePath);
         }
 
-        // B2. Datastore search queries
+        // B2. Datastore search queries (Respect GitHub Actions cache-hit if true)
+        const skipMonthlyFetch = process.env.CACHE_HIT === 'true';
         for (const [key, datasetId] of Object.entries(DATASTORE_DATASETS)) {
             const filePath = path.join(dynamicDir, `${key}.json`);
             let needsRefresh = true;
 
-            if (fs.existsSync(filePath)) {
+            if (skipMonthlyFetch && fs.existsSync(filePath)) {
+                console.log(`[Dynamic Datastore] Cache hit in CI. Skipping fetch for ${key}.`);
+                needsRefresh = false;
+            } else if (fs.existsSync(filePath)) {
                 const ageHours = getFileAgeInHours(filePath);
                 if (ageHours < 24) {
-                    console.log(`[Dynamic Datastore] Skipping fetch for ${key} (last updated in git ${ageHours.toFixed(1)} hours ago)`);
+                    console.log(`[Dynamic Datastore] Skipping fetch for ${key} (file age: ${ageHours.toFixed(1)} hours)`);
                     needsRefresh = false;
                 }
             }
@@ -122,14 +124,6 @@ async function syncAllData(): Promise<void> {
         }
         results.dynamicData = dynamicManifest;
 
-        // C. Fetch live real-time weather APIs
-        const realtimeResults: Record<string, any> = {};
-        for (const endpointName of REALTIME_ENDPOINTS) {
-            console.log(`[Realtime] Fetching API endpoint: ${endpointName}...`);
-            realtimeResults[endpointName] = await adapter.fetchRealtime(endpointName);
-        }
-        results.realtime = realtimeResults;
-
         // --- D. SPATIAL JOIN, FRESHNESS & VALIDATION (Ticket #12) ---
         console.log("Processing spatial joins and generating subzone metrics...");
 
@@ -144,7 +138,8 @@ async function syncAllData(): Promise<void> {
         }
 
         const subzonesData = parseSafely(subzonesPath, []);
-        const weatherBaselines = parseSafely(weatherBaselinesPath, { humidity: { byMonth: {} }, rainfall: { byMonth: {} } });
+        const weatherBaselines = parseSafely(weatherBaselinesPath, null);
+        if (!weatherBaselines) throw new Error("Missing or invalid weatherBaselines.json");
 
         // Load dynamic GeoJSON files safely
         const dengueClustersPath = path.join(dynamicDir, 'dengueClusters.json');
@@ -198,46 +193,99 @@ async function syncAllData(): Promise<void> {
             retrievedAt: new Date().toISOString(),
             status: fs.existsSync(highAedesPath) ? 'FRESH' : 'FAILED'
         };
-        datasetsStatus.weatherBaselines = {
-            retrievedAt: new Date().toISOString(),
-            status: 'FRESH'
-        };
 
-        // Parse records safely for WeatherProfile construction
-        const rainfallContent = parseSafely(rainfallMonthlyPath, {});
-        const humidityContent = parseSafely(relativeHumidityMonthlyPath, {});
-        const rainfallRecords = rainfallContent?.result?.records || (Array.isArray(rainfallContent) ? rainfallContent : []);
-        const humidityRecords = humidityContent?.result?.records || (Array.isArray(humidityContent) ? humidityContent : []);
+        // Parse records safely for WeatherProfile construction (Strict checking - no invented fallbacks)
+        const rainfallContent = parseSafely(rainfallMonthlyPath, null);
+        const humidityContent = parseSafely(relativeHumidityMonthlyPath, null);
+        const rainfallRecords = rainfallContent?.result?.records || [];
+        const humidityRecords = humidityContent?.result?.records || [];
+
+        if (rainfallRecords.length === 0 || humidityRecords.length === 0) {
+            throw new Error("Validation Error: Rainfall or Humidity monthly records are empty. Marking dataset sync FAILED.");
+        }
 
         // Rainfall (2-3 months back lag)
         const targetRainfallIndex = Math.max(0, rainfallRecords.length - 3);
-        const rainfallRecord = rainfallRecords[targetRainfallIndex] || {};
-        const rainfallMonthStr = String(rainfallRecord.month || rainfallRecord.date || rainfallRecord.yearMonth || '2026-07');
+        const rainfallRecord = rainfallRecords[targetRainfallIndex];
+        const rainfallMonthStr = String(rainfallRecord.month || rainfallRecord.date || rainfallRecord.yearMonth);
         const rainfallCalendarMonth = rainfallMonthStr.slice(-2);
-        const rainfallBaseline = weatherBaselines?.rainfall?.byMonth?.[rainfallCalendarMonth] || { mean: 0, sd: 0 };
+        const rainfallBaseline = weatherBaselines?.rainfall?.byMonth?.[rainfallCalendarMonth];
+        if (!rainfallBaseline) throw new Error(`Missing rainfall baseline for month: ${rainfallCalendarMonth}`);
 
         // Humidity (latest complete month)
-        const humidityRecord = humidityRecords[humidityRecords.length - 1] || {};
-        const humidityMonthStr = String(humidityRecord.month || humidityRecord.date || humidityRecord.yearMonth || '2026-09');
+        const humidityRecord = humidityRecords[humidityRecords.length - 1];
+        const humidityMonthStr = String(humidityRecord.month || humidityRecord.date || humidityRecord.yearMonth);
         const humidityCalendarMonth = humidityMonthStr.slice(-2);
-        const humidityBaseline = weatherBaselines?.humidity?.byMonth?.[humidityCalendarMonth] || { mean: 0, sd: 0 };
+        const humidityBaseline = weatherBaselines?.humidity?.byMonth?.[humidityCalendarMonth];
+        if (!humidityBaseline) throw new Error(`Missing humidity baseline for month: ${humidityCalendarMonth}`);
 
         const weatherProfile = {
             humidityMonth: humidityMonthStr,
-            meanHumidityPct: Number(humidityRecord.value || humidityRecord.humidity || humidityRecord.mean || 0),
+            meanHumidityPct: Number(humidityRecord.mean_rh ?? 0),
             humidityNormalMean: humidityBaseline.mean,
             humidityNormalSd: humidityBaseline.sd,
             rainfallMonth: rainfallMonthStr,
-            rainfallMm: Number(rainfallRecord.value || rainfallRecord.rainfall || rainfallRecord.total || 0),
+            rainfallMm: Number(rainfallRecord.total_rainfall ?? 0),
             rainfallNormalMean: rainfallBaseline.mean,
             rainfallNormalSd: rainfallBaseline.sd
         };
 
-        // Load population profiles safely
-        const popDensityPath = path.join(staticDir, 'ds2020PopulationDensity.json');
-        const populationProfilesData = parseSafely(popDensityPath, []);
+        // 3. Map to Entity Definitions
+        const retrievedTimestamp = new Date().toISOString();
 
-        // 3. VALIDATION GUARD: Reject empty arrays or all-zero metrics
+        // Build a lookup map of subzone areas from subzones.json for density calculation
+        const subzoneAreaMap = new Map<string, number>();
+        (subzonesData || []).forEach((sz: any) => {
+            const id = sz.subzoneId || sz.id || sz.name;
+            const area = sz.areaKm2 || 1;
+            if (id) {
+                subzoneAreaMap.set(String(id).toUpperCase(), Number(area));
+                if (sz.name) subzoneAreaMap.set(String(sz.name).toUpperCase(), Number(area));
+            }
+        });
+
+        // Map population profiles to PopulationProfile[] entities
+        const popDensityPath = path.join(staticDir, 'ds2020PopulationDensity.json');
+        const popContent = parseSafely(popDensityPath, null);
+        const populationProfilesData = (popContent?.result?.records || (Array.isArray(popContent) ? popContent : []))
+            .filter((r: any) => r.Number && r.Number !== "Total") // Skip the aggregate nationwide total row if present
+            .map((r: any) => {
+                const subzoneNameOrId = String(r.Number || '').trim();
+                const rawTotal = r.Total_Total;
+                const residentCount = (rawTotal === '-' || !rawTotal) ? 0 : Number(rawTotal);
+                const validResidentCount = isNaN(residentCount) ? 0 : residentCount;
+
+                // Look up subzone area to calculate correct density
+                const areaKm2 = subzoneAreaMap.get(subzoneNameOrId.toUpperCase()) || 1;
+                const computedDensity = validResidentCount / areaKm2;
+                
+                return {
+                    subzoneId: subzoneNameOrId,
+                    residentCount: validResidentCount,
+                    density: Number(computedDensity.toFixed(2)),
+                    housingComposition: String(r.housingComposition || 'HDB / Mixed')
+                };
+            });
+
+        // DengueCluster[]
+        const dengueClustersData = (dengueGeoJson?.features || []).map((f: any, idx: number) => ({
+            clusterId: String(f.id || f.properties?.ID || f.properties?.cluster_id || `cluster-${idx}`),
+            location: String(f.properties?.LOCATION || f.properties?.location || 'Unknown Location'),
+            caseCount: Number(f.properties?.CASE_SIZE || f.properties?.case_size || 0),
+            geometry: f.geometry,
+            retrievedAt: retrievedTimestamp,
+            subzoneId: String(f.properties?.subzoneId || f.properties?.subzone_id || '')
+        }));
+
+        // HighAedesArea[]
+        const highAedesAreasData = (aedesGeoJson?.features || []).map((f: any, idx: number) => ({
+            areaId: String(f.id || f.properties?.ID || f.properties?.area_id || `aedes-${idx}`),
+            geometry: f.geometry,
+            retrievedAt: retrievedTimestamp,
+            subzoneId: String(f.properties?.subzoneId || f.properties?.subzone_id || '')
+        }));
+
+        // 4. VALIDATION GUARD: Reject empty arrays or all-zero metrics
         const hasValidMetrics = Array.isArray(subzoneMetrics) && 
             subzoneMetrics.length > 0 && 
             subzoneMetrics.some((sz: any) => (sz.clusterCasesNearby ?? 0) > 0 || (sz.aedesOverlapRatio ?? 0) > 0);
@@ -246,14 +294,14 @@ async function syncAllData(): Promise<void> {
             throw new Error("Validation Error: Computed subzone metrics resulted in an empty array or all-zero values. Aborting to protect last good snapshot.");
         }
 
-        // 4. Publish Final PublicDataSnapshot matching required schema
+        // 5. Publish Final PublicDataSnapshot matching required schema
         const finalSnapshot = {
-            generatedAt: new Date().toISOString(),
+            generatedAt: retrievedTimestamp,
             datasets: datasetsStatus,
             weather: weatherProfile,
             populationProfiles: populationProfilesData,
-            dengueClusters: dengueGeoJson,
-            highAedesAreas: aedesGeoJson,
+            dengueClusters: dengueClustersData,
+            highAedesAreas: highAedesAreasData,
             subzones: subzoneMetrics
         };
 
@@ -262,9 +310,9 @@ async function syncAllData(): Promise<void> {
 
         // Also write master manifest for backward compatibility
         const masterManifestPath = path.join(process.cwd(), 'snapshot.json');
-        fs.writeFileSync(masterManifestPath, JSON.stringify({ generatedAt: new Date().toISOString(), ...results }, null, 4));
+        fs.writeFileSync(masterManifestPath, JSON.stringify({ generatedAt: retrievedTimestamp, ...results }, null, 4));
 
-        console.log("Successfully completed data sync, polygon spatial join, freshness checks, and snapshot publication!");
+        console.log("Successfully completed data sync, entity mapping, and snapshot publication!");
 
     } catch (error: any) {
         console.error("Error during data sync:", error.message);

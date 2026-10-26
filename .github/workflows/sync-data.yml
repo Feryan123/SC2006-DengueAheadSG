@@ -29,6 +29,7 @@ jobs:
         run: echo "CURRENT_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Cache dynamic monthly datasets
+        id: dynamic-cache
         uses: actions/cache@v4
         with:
           path: dengue-ahead-sg/data/dynamic
@@ -41,6 +42,7 @@ jobs:
       - run: npm run sync       # fetch → join → validate → write snapshot.json
         env:
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          CACHE_HIT: ${{ steps.dynamic-cache.outputs.cache-hit }}
 
       # Commit snapshot and derived metrics to the 'data' branch and push 
       - name: Commit and push snapshots
