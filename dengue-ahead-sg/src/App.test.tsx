@@ -11,7 +11,6 @@ import { LocationRiskControl } from './control/LocationRiskControl.ts';
 import { PreventionGuidanceControl } from './control/PreventionGuidanceControl.ts';
 import { RiskSimulationControl } from './control/RiskSimulationControl.ts';
 import { RiskAssessmentControl } from './control/RiskAssessmentControl.ts';
-import { RiskScoringServiceBoundary } from './services/RiskScoringServiceBoundary.ts';
 import { MockPublicDataService } from './services/mocks/MockPublicDataService.ts';
 import { AssessmentType, DataConfidence, RiskLevel } from './entity/enums.ts';
 import type { PublicDataSnapshot } from './services/ApprovedPublicDataServiceBoundary.ts';
@@ -112,7 +111,7 @@ async function click(label: string) {
 }
 
 function simulationControl() {
-  return new RiskSimulationControl(new RiskAssessmentControl(new RiskScoringServiceBoundary()));
+  return new RiskSimulationControl(new RiskAssessmentControl());
 }
 
 describe('App navigation (ticket 19)', () => {

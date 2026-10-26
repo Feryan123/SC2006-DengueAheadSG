@@ -1,82 +1,147 @@
 /**
  * Traces to: RiskAssessmentControl (<<control>>) in class diagram
- * Related use case(s): UC-1 Assess Location Risk (Generate Risk Assessment), UC-4 Simulate Risk Scenario
+ * Related use case(s): UC-1 Assess Location Risk, UC-2 Explore Risk Map, UC-4 Simulate Risk Scenario · Ticket 7
  *
- * METHODS:
- * - generateAssessment() — build a RiskAssessment for a planning subzone
- * - calculateRiskIndex() — risk index (0–100) = sum of the factor contributions
- * - determineRiskLevel() — map the risk index to a risk level (LOW < 50 ≤ MODERATE < 80 ≤ HIGH)
- *                          NOTE: This threshold is to be discussed again later, for constants MODERATE_THRESHOLD & HIGH_THREHSOLD
- * - calculateContributions() — get factor scores from the scoring API and add explanations
- * - collectInputs() — helper (not in diagram): pull one subzone's raw inputs out of a PublicDataSnapshot
- *
- * The scoring model itself lives behind RiskScoringServiceBoundary.
+ * Combines the 5 RiskFactorCalculator strategies into one RiskAssessment per subzone.
+ * Weights: rank-sum (riskModelConfig.ts); missing factors are dropped and the rest reweighted.
+ * Returns null (not an error) when a core factor is unavailable.
  *
  * Relationships (dependencies):
- * - Called by LocationRiskControl, RiskMapControl, RiskSimulationControl (PreventionGuidanceControl TODO(verify))
- * - Uses RiskScoringServiceBoundary (TODO(verify) not in diagram)
+ * - Called by LocationRiskControl, RiskMapControl (assessAll), RiskSimulationControl
+ * - Uses RiskFactorCalculator (Strategy) ×5
  * - Creates RiskAssessment and RiskFactorContribution
- * - Reads PlanningSubzone, PopulationProfile, HighAedesArea, DengueCluster
  */
-
-import type { AssessmentType, RiskLevel } from '../entity/enums.ts';
+import { AssessmentType, ContributionLevel, DataConfidence, DatasetStatus, RiskLevel, RiskFactorType } from '../entity/enums.ts';
+import type { PlanningSubzone } from '../entity/PlanningSubzone.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import type { RiskFactorContribution } from '../entity/RiskFactorContribution.ts';
 import type { Decimal } from '../entity/types.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
-import type { RiskInputs, RiskScoringServiceBoundary } from '../services/RiskScoringServiceBoundary.ts';
+import type { MapAssessmentControl } from './RiskMapControl.ts';
+import { CONTRIBUTION_BANDS, CORE_FACTORS, FACTOR_RANK, RISK_BANDS, rankSumWeights } from './riskModelConfig.ts';
+import type { FactorResult, RiskFactorCalculator } from './calculators/RiskFactorCalculator.ts';
+import { DengueClusterCalculator } from './calculators/DengueClusterCalculator.ts';
+import { HighAedesAreaCalculator } from './calculators/HighAedesAreaCalculator.ts';
+import { PopulationDensityCalculator } from './calculators/PopulationDensityCalculator.ts';
+import { HumidityCalculator } from './calculators/HumidityCalculator.ts';
+import { LaggedRainfallCalculator } from './calculators/LaggedRainfallCalculator.ts';
 
-// Constants, to be agreed upon
-export const HORIZON_DAYS = 14;         // how far ahead the risk prediction looks
-export const MODERATE_THRESHOLD = 50;   // below this is considered LOW
-export const HIGH_THRESHOLD = 80;       // equal or above this is considered HIGH
-                                        // other is considered MODERATE
+export const HORIZON_DAYS = 14;
 
 export interface GenerateAssessmentOptions {
-  // For simulations: use these inputs instead of reading them from the snapshot
-  inputs?: RiskInputs;
-  // Defaults to BASELINE
-  assessmentType?: AssessmentType;
+  assessmentType?: AssessmentType;   // defaults to BASELINE
 }
 
-export class RiskAssessmentControl {
-  readonly scoringService: RiskScoringServiceBoundary;
+export class RiskAssessmentControl implements MapAssessmentControl {
+  readonly calculators: RiskFactorCalculator[];
+  readonly weights: Record<RiskFactorType, number>;
 
-  constructor(scoringService: RiskScoringServiceBoundary) {
-    this.scoringService = scoringService;
+  constructor(calculators: RiskFactorCalculator[] = [
+    new DengueClusterCalculator(), new HighAedesAreaCalculator(), new PopulationDensityCalculator(),
+    new HumidityCalculator(), new LaggedRainfallCalculator(),
+  ]) {
+    this.calculators = calculators;
+    this.weights = rankSumWeights(FACTOR_RANK);
   }
 
   async generateAssessment(
-    _subzoneId: string,
-    _snapshot: PublicDataSnapshot,
-    _options: GenerateAssessmentOptions = {},
-  ): Promise<RiskAssessment> {
-    // TODO: get inputs (options.inputs, otherwise collectInputs)
-    // TODO: calculateContributions -> calculateRiskIndex -> determineRiskLevel
-    // TODO: set dataConfidence (rainfall missing = LOW, density missing = MEDIUM, otherwise HIGH)
-    // TODO: return a RiskAssessment (horizonDays = HORIZON_DAYS, dataTimeStamp = snapshot.retrievedAt)
-    throw new Error('Not implemented');
+    subzoneId: string,
+    snapshot: PublicDataSnapshot,
+    options: GenerateAssessmentOptions = {},
+  ): Promise<RiskAssessment | null> {
+    const subzone = snapshot.subzones?.find(s => s.subzoneId === subzoneId);
+    if (!subzone) return null;
+
+    if (snapshot.datasets?.dengueClusters?.status === DatasetStatus.Failed) return null;
+
+    const contributions = this.calculateContributions(subzone, snapshot); 
+    if (contributions === null) return null;
+    const riskIndex = this.calculateRiskIndex(contributions);
+    const riskLevel = this.determineRiskLevel(riskIndex);
+
+    return {
+      assessmentId: crypto.randomUUID(),
+      generatedAt: new Date().toISOString(),
+      dataTimeStamp: snapshot.generatedAt,
+      horizonDays: HORIZON_DAYS,
+      dataConfidence: this.determineDataConfidence(contributions, snapshot),
+      assessmentType: options.assessmentType ?? AssessmentType.Baseline, subzoneId, contributions, riskIndex, riskLevel,
+    };
   }
 
-  collectInputs(_subzoneId: string, _snapshot: PublicDataSnapshot): RiskInputs {
-    // TODO: throw if the subzone isn't in the snapshot
-    // TODO: rainfall, density, dengue case + cluster count, high-Aedes area count for this subzone
-    throw new Error('Not implemented');
+  async assessAll(snapshot: PublicDataSnapshot): Promise<RiskAssessment[]> {
+    const subzones = snapshot.subzones ?? [];
+    const results = await Promise.all(subzones.map(sz => this.generateAssessment(sz.subzoneId, snapshot)));
+
+    return results.filter((a): a is RiskAssessment => a !== null);
   }
 
-  async calculateContributions(_inputs: RiskInputs): Promise<RiskFactorContribution[]> {
-    // TODO: call this.scoringService.scoreFactors(inputs)
-    // TODO: add inputValue + a human-readable explanation to each score
-    throw new Error('Not implemented');
+  /** null when a CORE factor is missing. */
+  calculateContributions(subzone: PlanningSubzone, snapshot: PublicDataSnapshot): RiskFactorContribution[] | null {
+    const results = this.calculators
+      .map(calc => ({ factorType: calc.factorType, result: calc.calculate(subzone, snapshot) }))
+      .filter((r): r is { factorType: RiskFactorType; result: FactorResult } => r.result !== null);
+
+    const present = new Set(results.map(r => r.factorType));
+    if (CORE_FACTORS.some(f => !present.has(f))) return null;
+
+    const availableWeight = results.reduce((sum, r) => sum + this.weights[r.factorType], 0);
+
+    return results.map(({ factorType, result }) => {
+      const weight = this.weights[factorType];
+      return {
+        factorType,
+        inputValue: result.inputValue,
+        contribution: (result.score * weight) / availableWeight,
+        contributionLevel: this.determineContributionLevel(result.score),
+        explanation: this.explain(factorType, result),
+      };
+    });
   }
 
-  calculateRiskIndex(_contributions: RiskFactorContribution[]): Decimal {
-    // TODO: sum the contributions, clamp to 0–100, round to 1 decimal place
-    throw new Error('Not implemented');
+private explain(factorType: RiskFactorType, { inputValue, score }: FactorResult): string {
+  const s = Math.round(score);
+  switch(factorType){
+    case RiskFactorType.Humidity:
+      return `Humidity ${inputValue}% scores ${s}/100 against the 2014–2025 normal`;
+    case RiskFactorType.LaggedRainfall:
+      return `Rainfall of ${inputValue} mm scores ${s}/100 against the 2014–2025 normal`;
+    case RiskFactorType.DengueClusters:
+      return `${inputValue} cluster cases nearby scores ${s}/100 among subzones`;
+    case RiskFactorType.HighAedesArea:
+      return `${Math.round(inputValue * 100)}% overlap with high-Aedes areas scores ${s}/100 among subzones`;
+    case RiskFactorType.PopulationDensity:
+      return `${Math.round(inputValue)} residents/km² scores ${s}/100 among subzones`;
+    default:
+      return `${factorType} ${inputValue} scores ${s}/100`;
+  }
+}
+
+  calculateRiskIndex(contributions: RiskFactorContribution[]): Decimal {
+    const sum = contributions.reduce((total, c) => total + c.contribution, 0);
+    const capped = Math.min(100, Math.max(0, sum));
+    return Math.round(capped * 10) / 10;
   }
 
-  determineRiskLevel(_riskIndex: Decimal): RiskLevel {
-    // TODO: LOW below MODERATE_THRESHOLD, HIGH at or above HIGH_THRESHOLD, otherwise MODERATE
-    throw new Error('Not implemented');
+  determineRiskLevel(riskIndex: Decimal): RiskLevel {
+    if(riskIndex < RISK_BANDS.moderateFrom) return RiskLevel.Low;
+    if(riskIndex < RISK_BANDS.highFrom) return RiskLevel.Moderate;
+    if(riskIndex < RISK_BANDS.veryHighFrom) return RiskLevel.High;
+    return RiskLevel.VeryHigh;
+  }
+
+  determineContributionLevel(score: number): ContributionLevel {
+    if(score < CONTRIBUTION_BANDS.moderateFrom) return ContributionLevel.Low;
+    if(score < CONTRIBUTION_BANDS.highFrom) return ContributionLevel.Moderate;
+    return ContributionLevel.High;
+  }
+
+  determineDataConfidence(contributions: RiskFactorContribution[], snapshot: PublicDataSnapshot): DataConfidence {
+    const missing = this.calculators.length - contributions.length;   // missing ;
+    const anyStale = Object.values(snapshot.datasets ?? {}).some(d => d?.status === DatasetStatus.Stale);
+
+    if (missing >= 2) return DataConfidence.Low;
+    if (missing === 1 || anyStale) return DataConfidence.Medium;
+    return DataConfidence.High;
   }
 }
