@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+          cache-dependency-path: dengue-ahead-sg/package-lock.json
 
       - name: Get current date for daily cache key
         id: date
