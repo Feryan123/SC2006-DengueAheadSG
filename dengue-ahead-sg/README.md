@@ -108,6 +108,12 @@ The legend shows four risk levels, from light blue (Low) to dark blue (Very High
 Grey means no risk assessment is available; it does not mean Low risk. Map and
 result colours share `src/boundary/riskLevelStyle.ts`.
 
+Selecting an area opens a popup with its level, risk index and up to three main
+factors. **View full assessment** opens that area's result through the app's
+navigation callback. The **Top 10 subzones** list ranks assessed areas by risk
+index, highest first; select a list entry to find it on the map. Areas without
+assessments are left out of this list and their result action is disabled.
+
 Leaflet displays [OneMap tiles](https://www.onemap.gov.sg/docs/maps/index.html)
 with the required SLA attribution. Subzone outlines come from
 [URA's Master Plan 2019 dataset](https://data.gov.sg/datasets/d_8594ae9ff96d0c708bc2af633048edfb/view),

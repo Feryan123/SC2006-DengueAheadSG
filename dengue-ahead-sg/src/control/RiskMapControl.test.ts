@@ -5,8 +5,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RiskMapControl } from './RiskMapControl.ts';
 import { MockPublicDataService } from '../services/mocks/MockPublicDataService.ts';
-import { AssessmentType, DataConfidence, RiskLevel } from '../entity/enums.ts';
+import { AssessmentType, ContributionLevel, DataConfidence, RiskFactorType, RiskLevel } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
+import type { RiskFactorContribution } from '../entity/RiskFactorContribution.ts';
 
 function assessment(subzoneId: string, riskLevel: RiskLevel): RiskAssessment {
   return {
@@ -15,6 +16,10 @@ function assessment(subzoneId: string, riskLevel: RiskLevel): RiskAssessment {
     horizonDays: 14, dataConfidence: DataConfidence.High,
     assessmentType: AssessmentType.Baseline, contributions: [],
   };
+}
+
+function factor(factorType: RiskFactorType, contribution: number): RiskFactorContribution {
+  return { factorType, contribution, inputValue: 1, contributionLevel: ContributionLevel.Moderate, explanation: '' };
 }
 
 describe('RiskMapControl', () => {
@@ -99,5 +104,66 @@ describe('RiskMapControl', () => {
     const zone = snapshot.subzones[0];
     expect(await control.selectSubzone(zone.subzoneId, snapshot.subzones)).toBe(zone);
     expect(await control.selectSubzone('unknown', snapshot.subzones)).toBeNull();
+  });
+});
+
+describe('Map popup and ranking (ticket #22)', () => {
+  it('shows the three largest contributions without changing the original order', () => {
+    const item = assessment('area', RiskLevel.High);
+    item.contributions = [
+      factor(RiskFactorType.Humidity, 4), factor(RiskFactorType.DengueClusters, 20),
+      factor(RiskFactorType.PopulationDensity, 7), factor(RiskFactorType.LaggedRainfall, 12),
+      factor(RiskFactorType.HighAedesArea, 15),
+    ];
+    const original = [...item.contributions];
+    const result = new RiskMapControl().getTopFactors(item);
+    expect(result.map((factor) => factor.factorType)).toEqual([
+      RiskFactorType.DengueClusters, RiskFactorType.HighAedesArea, RiskFactorType.LaggedRainfall,
+    ]);
+    expect(item.contributions).toEqual(original);
+  });
+
+  it('handles missing factors and leaves out invalid contribution values', () => {
+    const control = new RiskMapControl();
+    expect(control.getTopFactors()).toEqual([]);
+    const item = assessment('area', RiskLevel.Low);
+    item.contributions = [NaN, -1, Infinity, 0, 3].map((value) => factor(RiskFactorType.Humidity, value));
+    expect(control.getTopFactors(item).map((factor) => factor.contribution)).toEqual([3, 0]);
+  });
+
+  it('ranks only the ten highest indices, using area ID to order a tie', async () => {
+    const snapshot = await new MockPublicDataService().retrievePublicData();
+    snapshot.subzones = Array.from({ length: 12 }, (_, index) => ({
+      ...snapshot.subzones[0], subzoneId: `area-${String(index).padStart(2, '0')}`, name: `Area ${index}`,
+    }));
+    const assessments = snapshot.subzones.map((zone, index) => ({
+      ...assessment(zone.subzoneId, RiskLevel.High), riskIndex: index * 8,
+    }));
+    assessments[10].riskIndex = 88;
+    const originalIds = assessments.map((item) => item.subzoneId);
+    const control = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => assessments });
+    const result = await control.loadRiskMap();
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
+    const ranked = control.getTopSubzones(result.data);
+    expect(ranked.map((item) => item.subzone.subzoneId)).toEqual([
+      'area-10', 'area-11', 'area-09', 'area-08', 'area-07',
+      'area-06', 'area-05', 'area-04', 'area-03', 'area-02',
+    ]);
+    expect(assessments.map((item) => item.subzoneId)).toEqual(originalIds);
+  });
+
+  it('leaves unknown areas and invalid indices out of the map and ranking', async () => {
+    const snapshot = await new MockPublicDataService().retrievePublicData();
+    const values = [NaN, -1, 101, Infinity, 0, 100];
+    const assessments = snapshot.subzones.map((zone, index) => ({
+      ...assessment(zone.subzoneId, RiskLevel.Low), riskIndex: values[index],
+    }));
+    assessments.push(assessment('unknown-area', RiskLevel.High), assessments[4]);
+    const control = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => assessments });
+    const result = await control.loadRiskMap();
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
+    expect(Object.keys(result.data.riskLevels)).toHaveLength(2);
+    expect(control.getTopSubzones(result.data).map((item) => item.assessment.riskIndex)).toEqual([100, 0]);
+    expect(control.getTopSubzones({ ...result.data, assessments: {} })).toEqual([]);
   });
 });
