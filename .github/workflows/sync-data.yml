@@ -29,13 +29,14 @@ jobs:
         env:
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
 
-      # Commit snapshot.json to the 'data' branch and push 
-      - name: Commit and push snapshot.json
+      # Commit snapshot and derived metrics to the 'data' branch and push 
+      - name: Commit and push snapshots
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           branch: data
           create_branch: true
-          # Note the folder prefix here so git-auto-commit finds it inside your subfolder
-          file_pattern: dengue-ahead-sg/snapshot.json
-          commit_message: "chore(data): auto-update dengue snapshot.json [skip ci]"
+          file_pattern: |
+            snapshot.json
+            data/derived/latest-snapshot.json
+          commit_message: "chore(data): auto-update dengue snapshot and metrics [skip ci]"
           skip_ci: true
