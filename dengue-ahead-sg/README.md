@@ -98,6 +98,35 @@ Official references: [authentication](https://www.onemap.gov.sg/apidocs/authenti
 [token errors](https://www.onemap.gov.sg/apidocs/docs/verifyingsearchapitoken),
 and [Vercel Node.js functions](https://vercel.com/docs/functions/runtimes/node-js).
 
+## Public data cache
+
+`SnapshotDataService` reads a published JSON snapshot using its supplied URL.
+`CachedPublicDataServiceProxy` wraps that reader and takes the bundled backup
+snapshot as its second constructor argument. Both implement
+`ApprovedPublicDataServiceBoundary`, so controls keep calling
+`retrievePublicData()` through the same contract. The start-up code supplies
+the URL and imports the backup with the app.
+
+The Proxy saves validated public data in `localStorage` under
+`dengue-ahead-sg:public-data:v1`. It reuses the cache for one hour. At exactly
+one hour it requests an update. If that request fails, it uses the last good
+cache, then the bundled backup. Invalid responses never replace good saved
+data. Blocked or full storage does not prevent a successful download from
+being used.
+
+Old-cache recovery and the bundled backup keep their original timestamps.
+Their dataset statuses become `STALE`, while `FAILED` stays `FAILED`.
+If all three sources are unusable, the service throws a safe unavailable-data
+error for the calling control to handle. The reader has a 10-second timeout.
+
+The downloaded and bundled data must match `PublicDataSnapshot`: generated
+time, dataset statuses, real subzone polygons and metrics, population profiles,
+cluster/Aedes records and the national monthly weather profile. The reader
+uses a public snapshot URL and sends no API key. Private data-source credentials
+belong in the pipeline's server environment.
+
+Run its checks with `npm test -- --run src/services/CachedPublicDataServiceProxy.test.ts`.
+
 ## Project structure
 
 The code follows the **Entity–Control–Boundary** pattern from our class diagram. Every class in the diagram has exactly one file, and each file starts with a header comment saying which class and use case it traces to and what is left to implement.

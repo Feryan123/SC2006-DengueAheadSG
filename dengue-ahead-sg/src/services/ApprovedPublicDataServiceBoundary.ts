@@ -1,17 +1,6 @@
-/**
- * Traces to: ApprovedPublicDataServiceBoundary (<<boundary>>) in class diagram
- * Related use case(s): UC-1 Assess Location Risk (Generate Risk Assessment), UC-2 Explore Risk Map (overlays)
- *
- * TO IMPLEMENT:
- * - retrievePublicData() — fetch data from the approved public data sources (data.gov.sg):
- *     - Rainfall Data Source
- *     - HDB Population / Density Data Source
- *     - Dengue Clusters Data Source
- *     - High-Aedes areas (source TODO(verify): not a separate actor in the use case diagram)
- *   Until then, use MockPublicDataService.
- *
- * Relationships: called by LocationRiskControl, RiskAssessmentControl, RiskMapControl
- */
+// - Define the public data used by location assessment and the risk map.
+// - The snapshot reader, cache Proxy and test mock use the same method.
+// - ApprovedPublicDataServiceBoundary: UC-1, UC-2 and Retrieve / Refresh Public Data.
 
 import type { DengueCluster } from '../entity/DengueCluster.ts';
 import type { HighAedesArea } from '../entity/HighAedesArea.ts';
@@ -32,8 +21,6 @@ export interface PublicDataSnapshot {
   weather: WeatherProfile;
 }
 
-export class ApprovedPublicDataServiceBoundary {
-  async retrievePublicData(): Promise<PublicDataSnapshot> {
-    throw new Error('ApprovedPublicDataServiceBoundary is not implemented yet — use MockPublicDataService');
-  }
+export interface ApprovedPublicDataServiceBoundary {
+  retrievePublicData(): Promise<PublicDataSnapshot>;
 }
