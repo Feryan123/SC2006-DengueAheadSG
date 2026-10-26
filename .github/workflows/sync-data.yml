@@ -52,8 +52,6 @@ jobs:
           push_options: '--force'
           branch: data
           create_branch: true
-          file_pattern: |
-            dengue-ahead-sg/snapshot.json
-            dengue-ahead-sg/data/derived/latest-snapshot.json
+          file_pattern: 'dengue-ahead-sg/snapshot.json dengue-ahead-sg/data/derived/latest-snapshot.json'
           commit_message: "chore(data): auto-update dengue snapshot and metrics [skip ci]"
           skip_ci: true
