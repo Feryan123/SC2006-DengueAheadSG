@@ -1,10 +1,12 @@
 
-// Shows subzone risk colours and a legend using Leaflet (UC-2, ticket #20).
+// - Show subzone colours, selected-area details and the top 10 assessed areas.
+// - Use Leaflet for the map and RiskMapControl for its data (UC-2).
 
 import { useEffect, useRef, useState } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
+import { createSubzonePopup } from './SubzonePopup.ts';
 import {
   RiskMapControl,
   type MapResult,
@@ -49,6 +51,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
   const selectedZone = data?.subzones.find((zone) => zone.subzoneId === selectedId);
   const selectedStyle = getRiskLevelStyle(data?.riskLevels[selectedId]);
   const unavailableStyle = getRiskLevelStyle();
+  const topSubzones = data ? control.getTopSubzones(data) : [];
 
   useEffect(() => {
     if (!mapElement.current) return;
@@ -77,6 +80,8 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
         const tooltip = document.createElement('span');
         tooltip.textContent = `${zone.name} — ${style.label}`;
         layer.bindTooltip(tooltip);
+        const assessment = data?.assessments[zone.subzoneId];
+        layer.bindPopup(createSubzonePopup(zone, assessment, control.getTopFactors(assessment), onRequestAssessment));
         layer.on('click', () => setSelectedId(zone.subzoneId));
         layer.addTo(leafletMap);
         areaLayers.current.push({ id: zone.subzoneId, layer });
@@ -95,9 +100,10 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
       map.current = null;
       areaLayers.current = [];
     };
-  }, [data]);
+  }, [data, control, onRequestAssessment]);
 
   useEffect(() => {
+    if (!selectedId) map.current?.closePopup();
     for (const area of areaLayers.current) {
       const selected = area.id === selectedId;
       area.layer.setStyle({
@@ -109,13 +115,17 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
       if (area.id === selectedId) {
         area.layer.bringToFront();
         map.current?.fitBounds(area.layer.getBounds(), { padding: [30, 30], maxZoom: 14 });
+        area.layer.openPopup();
       }
     }
-  }, [selectedId, data]);
+  }, [selectedId, data, control, onRequestAssessment]);
 
   async function selectSubzone(id: string) {
     const zone = await control.selectSubzone(id, data?.subzones ?? []);
     setSelectedId(zone?.subzoneId ?? '');
+    if (zone?.subzoneId === selectedId) {
+      areaLayers.current.find((area) => area.id === selectedId)?.layer.openPopup();
+    }
   }
 
   function searchSubzone() {
@@ -160,6 +170,22 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
             <span className="risk-pill" style={{ backgroundColor: selectedStyle.colour, color: selectedStyle.textColour }}>{selectedStyle.label}</span>
             <button className="primary" disabled={!selectedId || !data?.riskLevels[selectedId]} onClick={requestAssessment}>View Assessment</button>
           </div>
+          <section className="card map-ranking" aria-label="Top 10 subzones">
+            <h2>Top 10 subzones</h2>
+            <p className="muted small">Assessed areas ranked by risk index, highest first.</p>
+            {topSubzones.length > 0 ? (
+              <ol className="top-risk-list">
+                {topSubzones.map(({ subzone, assessment }) => (
+                  <li key={subzone.subzoneId}>
+                    <button type="button" aria-label={`Show ${subzone.name} on map`} onClick={() => void selectSubzone(subzone.subzoneId)}>
+                      <span>{subzone.name}</span>
+                      <span>{assessment.riskIndex.toFixed(1)} · {getRiskLevelStyle(assessment.riskLevel).label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="muted">No assessed areas are available yet.</p>}
+          </section>
         </div>
 
         <aside className="card map-side">

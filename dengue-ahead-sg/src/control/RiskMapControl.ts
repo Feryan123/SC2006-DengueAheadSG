@@ -1,10 +1,12 @@
 
-// Loads areas and their assessed risk levels for RiskMapBoundary (UC-2).
+// - Load areas and their supplied risk assessments for the map.
+// - Sort the top areas and factors without calculating risk (UC-2).
 
 import type { DengueCluster } from '../entity/DengueCluster.ts';
 import type { HighAedesArea } from '../entity/HighAedesArea.ts';
 import { RiskLevel } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
+import type { RiskFactorContribution } from '../entity/RiskFactorContribution.ts';
 import type { ApprovedPublicDataServiceBoundary, PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
 import { loadSubzoneBoundaries, type SubzoneBoundary } from '../services/SubzoneBoundaryService.ts';
 
@@ -22,6 +24,7 @@ export type MapData = {
   dengueClusters: DengueCluster[];
   highAedesAreas: HighAedesArea[];
   riskLevels: Record<string, RiskLevel>;
+  assessments: Record<string, RiskAssessment>;
 };
 
 // Loading either succeeds or returns an error.
@@ -52,16 +55,20 @@ export class RiskMapControl {
       if (!this.dataService) {
         // Show real outlines while the team's risk calculations are still pending.
         const subzones = await loadSubzoneBoundaries();
-        return { status: 'OK', data: { subzones, dengueClusters: [], highAedesAreas: [], riskLevels: {} } };
+        return { status: 'OK', data: { subzones, dengueClusters: [], highAedesAreas: [], riskLevels: {}, assessments: {} } };
       }
       const snapshot = await this.dataService.retrievePublicData();
       if (snapshot.subzones.length === 0) return this.handleUnavailableData();
 
       const riskLevels: Record<string, RiskLevel> = {};
+      const assessmentsBySubzone: Record<string, RiskAssessment> = {};
+      const subzoneIds = new Set(snapshot.subzones.map((zone) => zone.subzoneId));
       const assessments = this.assessmentControl ? await this.assessmentControl.assessAll(snapshot) : [];
       for (const assessment of assessments) {
-        if (Object.values(RiskLevel).includes(assessment.riskLevel)) {
+        if (subzoneIds.has(assessment.subzoneId) && Object.values(RiskLevel).includes(assessment.riskLevel)
+          && Number.isFinite(assessment.riskIndex) && assessment.riskIndex >= 0 && assessment.riskIndex <= 100) {
           riskLevels[assessment.subzoneId] = assessment.riskLevel;
+          assessmentsBySubzone[assessment.subzoneId] = assessment;
         }
       }
 
@@ -72,6 +79,7 @@ export class RiskMapControl {
           dengueClusters: snapshot.dengueClusters,
           highAedesAreas: snapshot.highAedesAreas,
           riskLevels,
+          assessments: assessmentsBySubzone,
         },
       };
     } catch {
@@ -82,6 +90,29 @@ export class RiskMapControl {
   // Find an area using its subzone ID.
   async selectSubzone(id: string, subzones: SubzoneBoundary[]) {
     return subzones.find((zone) => zone.subzoneId === id) ?? null;
+  }
+
+  // Ticket #22: display the largest contributions, without changing P1's scores.
+  getTopFactors(assessment?: RiskAssessment): RiskFactorContribution[] {
+    const factors = assessment?.contributions ?? [];
+    return factors
+      .filter((factor) => Number.isFinite(factor.contribution) && factor.contribution >= 0)
+      .sort((a, b) => b.contribution - a.contribution)
+      .slice(0, 3);
+  }
+
+  // Ticket #22: rank only areas with a valid assessment.
+  getTopSubzones(data: MapData) {
+    const ranked: { subzone: SubzoneBoundary; assessment: RiskAssessment }[] = [];
+    for (const subzone of data.subzones) {
+      const assessment = data.assessments[subzone.subzoneId];
+      if (assessment) ranked.push({ subzone, assessment });
+    }
+    ranked.sort((a, b) => {
+      if (a.assessment.riskIndex !== b.assessment.riskIndex) return b.assessment.riskIndex - a.assessment.riskIndex;
+      return a.subzone.subzoneId.localeCompare(b.subzone.subzoneId);
+    });
+    return ranked.slice(0, 10);
   }
 
   // Switch an overlay on or off.

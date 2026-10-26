@@ -78,6 +78,14 @@ input::placeholder { color: #8a9aa3; }
 .map-summary { margin-top: 2px; padding: 18px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .map-summary > div { flex: 1; }
 .map-summary p { margin: 7px 0 0; }
+.map-ranking { margin-top: 16px; padding: 20px; }
+.map-ranking h2 { font-size: 20px; }
+.top-risk-list { padding-left: 24px; margin-bottom: 0; }
+.top-risk-list li { margin: 8px 0; }
+.top-risk-list button { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; border: 0; background: none; color: #173b55; padding: 6px; }
+.top-risk-list button:hover { background: #eef3f5; }
+.subzone-popup h3 { margin: 0 0 12px; font-size: 16px; }
+.subzone-popup li { margin: 5px 0; }
 .map-side { padding: 26px; border-radius: 22px; }
 .map-side h2 { font-size: 23px; margin-bottom: 20px; }
 .map-side h3 { margin: 24px 0 14px; }
