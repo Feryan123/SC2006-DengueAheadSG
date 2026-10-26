@@ -21,7 +21,11 @@ const DATASTORE_DATASETS: Record<string, string> = {
     relativeHumidityMonthly: "d_e3b1111a26b2aefef4f386c068d4ca5d"
 };
 
-const REALTIME_ENDPOINTS: string[] = [];
+const REALTIME_ENDPOINTS: string[] = [
+    //"airTemperature",
+    //"rainfall",
+    //"relativeHumidity"
+];
 
 /**
  * Helper to check file age in hours using file modification time (mtime)
@@ -123,6 +127,14 @@ async function syncAllData(): Promise<void> {
             dynamicManifest[key] = path.relative(process.cwd(), filePath);
         }
         results.dynamicData = dynamicManifest;
+        
+        // C. Fetch live real-time weather APIs
+        const realtimeResults: Record<string, any> = {};
+        for (const endpointName of REALTIME_ENDPOINTS) {
+            console.log(`[Realtime] Fetching API endpoint: ${endpointName}...`);
+            realtimeResults[endpointName] = await adapter.fetchRealtime(endpointName);
+        }
+        results.realtime = realtimeResults;
 
         // --- D. SPATIAL JOIN, FRESHNESS & VALIDATION (Ticket #12) ---
         console.log("Processing spatial joins and generating subzone metrics...");
