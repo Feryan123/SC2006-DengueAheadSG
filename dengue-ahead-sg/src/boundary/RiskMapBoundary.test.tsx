@@ -11,7 +11,7 @@ import RiskResultBoundary from './RiskResultBoundary.tsx';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
 import { RiskMapControl } from '../control/RiskMapControl.ts';
 import { MockPublicDataService } from '../services/mocks/MockPublicDataService.ts';
-import { AssessmentType, DataConfidence, RiskLevel } from '../entity/enums.ts';
+import { AssessmentType, ContributionLevel, DataConfidence, RiskFactorType, RiskLevel } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import officialOutlinesJson from '../assets/subzones.geojson?raw';
 import { loadSubzoneBoundaries } from '../services/SubzoneBoundaryService.ts';
@@ -54,7 +54,7 @@ function assessment(subzoneId: string, riskLevel: RiskLevel): RiskAssessment {
 async function mapWithAssessments() {
   const snapshot = await new MockPublicDataService().retrievePublicData();
   const assessments = Object.values(RiskLevel).map((level, index) => assessment(snapshot.subzones[index].subzoneId, level));
-  return { snapshot, control: new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => assessments }) };
+  return { snapshot, assessments, control: new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => assessments }) };
 }
 
 function button(label: string) {
@@ -184,6 +184,7 @@ describe('Risk map', () => {
     expect(container.textContent).toContain('No matching area');
     expect(container.querySelector('select')?.value).toBe('');
     expect(button('View Assessment').disabled).toBe(true);
+    expect(container.querySelector('.leaflet-popup')).toBeNull();
   });
 
   it('shows a clear error when data cannot load', async () => {
@@ -213,7 +214,72 @@ describe('Risk map', () => {
     const path = container.querySelector('path.leaflet-interactive')!;
     await act(async () => path.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
     expect(container.querySelector('.leaflet-tooltip')?.textContent).toContain('<img id="unsafe-name" src="x">');
+    await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.querySelector('.subzone-popup h3')?.textContent).toBe('<img id="unsafe-name" src="x">');
     expect(container.querySelector('#unsafe-name')).toBeNull();
+  });
+});
+
+describe('Map details (ticket #22)', () => {
+  it('opens a popup with the level, three largest factors and the correct result action', async () => {
+    const { snapshot, assessments, control } = await mapWithAssessments();
+    assessments[0].contributions = Object.values(RiskFactorType).map((factorType, index) => ({
+      factorType, inputValue: 1, contribution: (index + 1) * 5,
+      contributionLevel: ContributionLevel.Moderate, explanation: '',
+    }));
+    const onRequestAssessment = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={onRequestAssessment} />));
+    await act(async () => container.querySelector('path.leaflet-interactive')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const popup = container.querySelector('.subzone-popup')!;
+    expect(popup.querySelector('h3')?.textContent).toBe(snapshot.subzones[0].name);
+    expect(popup.querySelector('.risk-pill')?.textContent).toBe('Low');
+    expect(popup.textContent).toContain('Risk index: 50.0');
+    expect([...popup.querySelectorAll('li')].map((item) => item.textContent)).toEqual([
+      'Lagged rainfall: 25.0 points', 'Humidity: 20.0 points', 'Population density: 15.0 points',
+    ]);
+    await act(async () => button('View full assessment').click());
+    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId);
+  });
+
+  it('shows unavailable details and disables the result action for an unassessed area', async () => {
+    const { control } = await mapWithAssessments();
+    const onRequestAssessment = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={onRequestAssessment} />));
+    const path = container.querySelectorAll('path.leaflet-interactive')[4];
+    await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const popup = container.querySelector('.subzone-popup')!;
+    expect(popup.textContent).toContain('Risk unavailable');
+    expect(popup.textContent).toContain('No risk assessment is available');
+    expect(popup.textContent).not.toContain('Risk index:');
+    expect(popup.querySelectorAll('li')).toHaveLength(0);
+    expect(button('View full assessment').disabled).toBe(true);
+    await act(async () => button('View full assessment').click());
+    expect(onRequestAssessment).not.toHaveBeenCalled();
+  });
+
+  it('lists assessed areas by highest index and opens their map popup from the list', async () => {
+    const { snapshot, assessments, control } = await mapWithAssessments();
+    assessments.forEach((item, index) => { item.riskIndex = (index + 1) * 20; });
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
+    const items = [...container.querySelectorAll('.top-risk-list button')];
+    expect(items.map((item) => item.querySelector('span')?.textContent)).toEqual(
+      snapshot.subzones.slice(0, 4).reverse().map((zone) => zone.name),
+    );
+    await act(async () => (items[0] as HTMLButtonElement).click());
+    expect(container.querySelector('select')?.value).toBe(snapshot.subzones[3].subzoneId);
+    expect(container.querySelector('.subzone-popup h3')?.textContent).toBe(snapshot.subzones[3].name);
+    expect(container.querySelector('.subzone-popup')?.textContent).toContain('Factor details are unavailable.');
+    await act(async () => (container.querySelector('.leaflet-popup-close-button') as HTMLElement).click());
+    expect(container.querySelector('.leaflet-popup')).toBeNull();
+    await act(async () => (items[0] as HTMLButtonElement).click());
+    expect(container.querySelector('.subzone-popup h3')?.textContent).toBe(snapshot.subzones[3].name);
+  });
+
+  it('shows an empty ranking instead of inventing risk scores', async () => {
+    const control = new RiskMapControl(new MockPublicDataService());
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
+    expect(container.querySelector('.map-ranking')?.textContent).toContain('No assessed areas are available yet.');
+    expect(container.querySelectorAll('.top-risk-list li')).toHaveLength(0);
   });
 });
 
