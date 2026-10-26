@@ -1,5 +1,5 @@
 import * as turf from '@turf/turf';
-import type { Polygon, MultiPolygon, Feature } from 'geojson';
+import type { Polygon, MultiPolygon} from 'geojson';
 
 export interface SubzoneItem {
   subzoneId: string;
