@@ -1,62 +1,85 @@
 import * as turf from '@turf/turf';
-import type { Polygon, MultiPolygon} from 'geojson';
+import type { Polygon, MultiPolygon, Feature, FeatureCollection } from 'geojson';
+import type { PlanningSubzone } from '../entity/PlanningSubzone.ts';
 
-export interface SubzoneItem {
-  subzoneId: string;
-  name: string;
+export interface SubzoneItem extends Omit<PlanningSubzone, 'clusterCasesNearby' | 'aedesOverlapRatio'> {
   planningArea: string;
   residentCount: number;
   areaKm2: number;
-  residentsPerKm2: number;
-  boundary: Polygon | MultiPolygon;
-}
-
-export interface SubzoneProcessedMetric extends SubzoneItem {
-  caseCount: number;
-  dengueRiskLevel: 'Low' | 'Moderate' | 'High';
 }
 
 /**
- * Performs a spatial join between raw incident points and subzone boundaries.
- * Natively supports both Polygon and MultiPolygon GeoJSON geometries.
+ * Performs a spatial join between dengue clusters / high-Aedes areas and subzone boundaries.
+ * Natively supports both Polygon and MultiPolygon GeoJSON geometries and returns PlanningSubzone entities.
  */
 export function processSubzoneSpatialJoin(
   subzonesData: SubzoneItem[],
-  rawIncidentPoints: Array<{ lat: number; lng: number }>
-): SubzoneProcessedMetric[] {
-  // 1. Convert raw incident points into a Turf FeatureCollection of Points
-  // Note: Turf.js expects coordinates as [longitude, latitude]
-  const pointFeatures = rawIncidentPoints.map(pt =>
-    turf.point([pt.lng, pt.lat])
-  );
-  const pointsCollection = turf.featureCollection(pointFeatures);
+  dengueClustersGeoJson: FeatureCollection<Polygon | MultiPolygon> | { features: any[] },
+  highAedesGeoJson: FeatureCollection<Polygon | MultiPolygon> | { features: any[] }
+): PlanningSubzone[] {
+  
+  // Normalize feature collections safely
+  const dengueFeatures = (dengueClustersGeoJson?.features || []) as Feature<Polygon | MultiPolygon>[];
+  const aedesFeatures = (highAedesGeoJson?.features || []) as Feature<Polygon | MultiPolygon>[];
 
-  // 2. Map over each subzone and perform the spatial join
   return subzonesData.map(subzone => {
-    let caseCount = 0;
+    let clusterCasesNearby = 0;
+    let aedesOverlapRatio = 0;
 
     try {
-      // Create a Turf feature for the subzone boundary (handles Polygon & MultiPolygon)
-      const subzoneFeature = turf.feature(subzone.boundary, {
-        subzoneId: subzone.subzoneId,
-        name: subzone.name,
-      });
+      const subzonePolygon = turf.feature(subzone.boundary as any);
 
-      // turf.pointsWithinPolygon checks all rings/polygons inside the boundary natively
-      const pointsWithin = turf.pointsWithinPolygon(pointsCollection, subzoneFeature);
-      caseCount = pointsWithin.features.length;
+      // 1. Calculate clusterCasesNearby via polygon overlap summing CASE_SIZE
+      for (const cluster of dengueFeatures) {
+        try {
+          const clusterPolygon = turf.feature(cluster.geometry);
+          const intersection = turf.intersect(
+            turf.featureCollection([subzonePolygon, clusterPolygon]) as any
+          );
+
+          if (intersection) {
+            const caseSize = Number(cluster.properties?.CASE_SIZE || cluster.properties?.case_size || 0);
+            clusterCasesNearby += caseSize;
+          }
+        } catch {
+          // Skip invalid cluster geometry intersections
+        }
+      }
+
+      // 2. Calculate aedesOverlapRatio (high-Aedes area overlap ÷ subzone area)
+      let totalAedesOverlapForSubzone = 0;
+      for (const aedesArea of aedesFeatures) {
+        try {
+          const aedesPolygon = turf.feature(aedesArea.geometry);
+          const intersection = turf.intersect(
+            turf.featureCollection([subzonePolygon, aedesPolygon]) as any
+          );
+
+          if (intersection) {
+            const overlapAreaKm2 = turf.area(intersection) / 1_000_000; // Convert sq meters to sq km
+            totalAedesOverlapForSubzone += overlapAreaKm2;
+          }
+        } catch {
+          // Skip invalid aedes geometry intersections
+        }
+      }
+
+      // Compute ratio, capped at 1.0 (100%)
+      const subzoneArea = subzone.areaKm2 > 0 ? subzone.areaKm2 : 1;
+      aedesOverlapRatio = Math.min(1.0, totalAedesOverlapForSubzone / subzoneArea);
+
     } catch (error) {
       console.error(`Spatial join error for subzone ${subzone.subzoneId}:`, error);
+      aedesOverlapRatio = 0;
     }
 
-    // Determine simple risk category based on case count
-    const riskLevel: 'Low' | 'Moderate' | 'High' = 
-      caseCount > 5 ? 'High' : caseCount > 2 ? 'Moderate' : 'Low';
-
     return {
-      ...subzone,
-      caseCount,
-      dengueRiskLevel: riskLevel,
+      subzoneId: subzone.subzoneId,
+      name: subzone.name,
+      boundary: subzone.boundary,
+      residentsPerKm2: subzone.residentsPerKm2,
+      clusterCasesNearby,
+      aedesOverlapRatio: Number(aedesOverlapRatio.toFixed(4)),
     };
   });
 }

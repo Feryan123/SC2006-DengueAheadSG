@@ -31,16 +31,15 @@ const REALTIME_ENDPOINTS: string[] = [
 
 /**
  * Helper to check how many hours ago a file was last modified and committed in git.
- * This allows an hourly GitHub Action to intelligently throttle weather fetches to once every 24 hours.
  */
 function getFileAgeInHours(filePath: string): number {
     try {
         const timestampStr = execSync(`git log -1 --format=%ct -- "${filePath}"`, { encoding: 'utf8' }).trim();
-        if (!timestampStr) return 999; // Untracked files are treated as old / needing sync
+        if (!timestampStr) return 999; 
         const commitTimeMs = parseInt(timestampStr, 10) * 1000;
         return (Date.now() - commitTimeMs) / (1000 * 60 * 60);
     } catch {
-        return 999; // Fallback if git history isn't available or command fails
+        return 999; 
     }
 }
 
@@ -59,7 +58,7 @@ async function syncAllData(): Promise<void> {
         if (!fs.existsSync(dynamicDir)) fs.mkdirSync(dynamicDir, { recursive: true });
         if (!fs.existsSync(derivedDir)) fs.mkdirSync(derivedDir, { recursive: true });
 
-        // A. Handle Static Data (Idempotent: skips if file already exists)
+        // A. Handle Static Data
         const staticManifest: Record<string, string> = {};
         for (const item of STATIC_DATASETS) {
             const filePath = path.join(staticDir, `${item.key}.json`);
@@ -81,7 +80,7 @@ async function syncAllData(): Promise<void> {
         // B. Handle Dynamic Datasets
         const dynamicManifest: Record<string, string> = {};
 
-        // B1. Poll-Download streams (Always fetch latest every hourly run)
+        // B1. Poll-Download streams
         for (const [key, datasetId] of Object.entries(POLL_DOWNLOAD_DATASETS)) {
             const filePath = path.join(dynamicDir, `${key}.json`);
             console.log(`[Dynamic Poll] Fetching latest live data for: ${key}...`);
@@ -89,7 +88,7 @@ async function syncAllData(): Promise<void> {
             dynamicManifest[key] = path.relative(process.cwd(), filePath);
         }
 
-        // B2. Datastore search queries (Rainfall & Humidity - Refreshed DAILY via Git age check)
+        // B2. Datastore search queries
         for (const [key, datasetId] of Object.entries(DATASTORE_DATASETS)) {
             const filePath = path.join(dynamicDir, `${key}.json`);
             let needsRefresh = true;
@@ -124,7 +123,6 @@ async function syncAllData(): Promise<void> {
         // --- D. SPATIAL JOIN, FRESHNESS & VALIDATION (Ticket #12) ---
         console.log("Processing spatial joins and generating subzone metrics...");
 
-        // 1. Read committed static/derived baseline files
         const subzonesPath = path.join(derivedDir, 'subzones.json');
         const weatherBaselinesPath = path.join(derivedDir, 'weatherBaselines.json');
 
@@ -136,59 +134,95 @@ async function syncAllData(): Promise<void> {
         }
 
         const subzonesData = JSON.parse(fs.readFileSync(subzonesPath, 'utf8'));
+        const weatherBaselines = JSON.parse(fs.readFileSync(weatherBaselinesPath, 'utf8'));
 
-        // 2. Load newly fetched dynamic dengue data and safely normalize into { lat, lng } points
+        // Load dynamic GeoJSON files
         const dengueClustersPath = path.join(dynamicDir, 'dengueClusters.json');
-        const dengueFileContent = fs.existsSync(dengueClustersPath) 
-            ? JSON.parse(fs.readFileSync(dengueClustersPath, 'utf8')) 
-            : [];
+        const highAedesPath = path.join(dynamicDir, 'highAedesAreas.json');
 
-        let incidentPoints: Array<{ lat: number; lng: number }> = [];
+        const dengueGeoJson = fs.existsSync(dengueClustersPath) ? JSON.parse(fs.readFileSync(dengueClustersPath, 'utf8')) : { features: [] };
+        const aedesGeoJson = fs.existsSync(highAedesPath) ? JSON.parse(fs.readFileSync(highAedesPath, 'utf8')) : { features: [] };
 
-        if (Array.isArray(dengueFileContent)) {
-            incidentPoints = dengueFileContent;
-        } else if (dengueFileContent && Array.isArray(dengueFileContent.features)) {
-            incidentPoints = dengueFileContent.features.map((f: any) => {
-                const coords = f.geometry?.coordinates;
-                return {
-                    lng: coords?.[0],
-                    lat: coords?.[1]
-                };
-            }).filter((pt: any) => pt.lat != null && pt.lng != null);
-        } else if (dengueFileContent && Array.isArray(dengueFileContent.data)) {
-            incidentPoints = dengueFileContent.data;
-        }
+        // 1. Perform Turf.js polygon spatial join & aedes ratio calculations
+        const subzoneMetrics = processSubzoneSpatialJoin(subzonesData, dengueGeoJson, aedesGeoJson);
 
-        // 3. Perform Turf.js spatial join using your normalized points helper
-        const subzoneMetrics = processSubzoneSpatialJoin(subzonesData, incidentPoints);
+        // 2. Track Dataset Status and Freshness
+        const datasetsStatus: Record<string, { retrievedAt: string; status: 'FRESH' | 'STALE' | 'FAILED' }> = {};
+        const now = new Date();
 
-        // 4. Track Dataset Status and Freshness (Stale if latest month is > 2 months old)
-        const rainfallMonthlyPath = path.join(dynamicDir, 'rainfallMonthly.json');
-        let rainfallStatus = 'fresh';
-        if (fs.existsSync(rainfallMonthlyPath)) {
-            const rainfallData = JSON.parse(fs.readFileSync(rainfallMonthlyPath, 'utf8'));
-            const latestRecord = rainfallData[rainfallData.length - 1];
-            const latestDate = new Date(latestRecord?.date || latestRecord?.yearMonth || Date.now());
-            const now = new Date();
-            const monthsElapsed = (now.getFullYear() - latestDate.getFullYear()) * 12 + (now.getMonth() - latestDate.getMonth());
-            if (monthsElapsed > 2) {
-                rainfallStatus = 'stale';
+        function evaluateMonthlyFreshness(filePath: string): 'FRESH' | 'STALE' | 'FAILED' {
+            try {
+                if (!fs.existsSync(filePath)) return 'FAILED';
+                const fileContent = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                // Handles both direct array and { result: { records } } structures
+                const records = fileContent?.result?.records || (Array.isArray(fileContent) ? fileContent : []);
+                if (records.length === 0) return 'STALE';
+
+                const latestRecord = records[records.length - 1];
+                const dateVal = latestRecord?.date || latestRecord?.yearMonth || latestRecord?.month || latestRecord?._timestamp;
+                if (!dateVal) return 'FRESH';
+
+                const latestDate = new Date(dateVal);
+                const monthsElapsed = (now.getFullYear() - latestDate.getFullYear()) * 12 + (now.getMonth() - latestDate.getMonth());
+                return monthsElapsed > 2 ? 'STALE' : 'FRESH';
+            } catch {
+                return 'FAILED';
             }
         }
 
-        // 5. VALIDATION GUARD: Invalid data never overwrites the last good snapshot
-        if (!subzoneMetrics || !Array.isArray(subzoneMetrics) || subzoneMetrics.length === 0) {
-            throw new Error("Validation Error: Computed subzone metrics resulted in an empty array. Aborting to protect last good snapshot.");
+        const rainfallMonthlyPath = path.join(dynamicDir, 'rainfallMonthly.json');
+        const relativeHumidityMonthlyPath = path.join(dynamicDir, 'relativeHumidityMonthly.json');
+
+        datasetsStatus.rainfallMonthly = {
+            retrievedAt: new Date().toISOString(),
+            status: evaluateMonthlyFreshness(rainfallMonthlyPath)
+        };
+        datasetsStatus.relativeHumidityMonthly = {
+            retrievedAt: new Date().toISOString(),
+            status: evaluateMonthlyFreshness(relativeHumidityMonthlyPath)
+        };
+        datasetsStatus.dengueClusters = {
+            retrievedAt: new Date().toISOString(),
+            status: fs.existsSync(dengueClustersPath) ? 'FRESH' : 'FAILED'
+        };
+        datasetsStatus.highAedesAreas = {
+            retrievedAt: new Date().toISOString(),
+            status: fs.existsSync(highAedesPath) ? 'FRESH' : 'FAILED'
+        };
+        datasetsStatus.weatherBaselines = {
+            retrievedAt: new Date().toISOString(),
+            status: 'FRESH'
+        };
+
+        // Extract latest rainfall record for weather inclusion
+        let latestRainfallRecord = null;
+        if (fs.existsSync(rainfallMonthlyPath)) {
+            try {
+                const rainfallContent = JSON.parse(fs.readFileSync(rainfallMonthlyPath, 'utf8'));
+                const records = rainfallContent?.result?.records || (Array.isArray(rainfallContent) ? rainfallContent : []);
+                if (records.length > 0) {
+                    latestRainfallRecord = records[records.length - 1];
+                }
+            } catch {}
         }
 
-        // 6. Publish Final Validated Snapshot
+        // 3. VALIDATION GUARD: Reject empty arrays or all-zero metrics
+        const hasValidMetrics = Array.isArray(subzoneMetrics) && 
+            subzoneMetrics.length > 0 && 
+            subzoneMetrics.some((sz: any) => (sz.clusterCasesNearby ?? 0) > 0 || (sz.aedesOverlapRatio ?? 0) > 0);
+
+        if (!hasValidMetrics) {
+            throw new Error("Validation Error: Computed subzone metrics resulted in an empty array or all-zero values. Aborting to protect last good snapshot.");
+        }
+
+        // 4. Publish Final PublicDataSnapshot matching required schema
         const finalSnapshot = {
             lastUpdated: new Date().toISOString(),
-            datasetStatuses: {
-                rainfallMonthly: rainfallStatus,
-                weatherBaselines: "fresh",
-                dengueClusters: "fresh"
+            datasets: datasetsStatus,
+            weather: {
+                latestRainfallMonth: latestRainfallRecord
             },
+            weatherBaselines,
             subzones: subzoneMetrics
         };
 
@@ -199,12 +233,10 @@ async function syncAllData(): Promise<void> {
         const masterManifestPath = path.join(process.cwd(), 'snapshot.json');
         fs.writeFileSync(masterManifestPath, JSON.stringify({ lastUpdated: new Date().toISOString(), ...results }, null, 4));
 
-        console.log("Successfully completed data sync, spatial join, validation, and snapshot publication!");
+        console.log("Successfully completed data sync, polygon spatial join, freshness checks, and snapshot publication!");
 
     } catch (error: any) {
         console.error("Error during data sync:", error.message);
-        // CRITICAL: Exit with non-zero exit code so the GitHub Action fails and 
-        // the previous 'latest-snapshot.json' file remains completely untouched.
         process.exit(1);
     }
 }
