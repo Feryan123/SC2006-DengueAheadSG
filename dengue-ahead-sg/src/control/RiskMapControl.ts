@@ -7,6 +7,7 @@ import type { HighAedesArea } from '../entity/HighAedesArea.ts';
 import { RiskLevel } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import type { RiskFactorContribution } from '../entity/RiskFactorContribution.ts';
+import type { PlanningSubzone } from '../entity/PlanningSubzone.ts';
 import type { ApprovedPublicDataServiceBoundary, PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
 import { loadSubzoneBoundaries, type SubzoneBoundary } from '../services/SubzoneBoundaryService.ts';
 
@@ -25,6 +26,13 @@ export type MapData = {
   highAedesAreas: HighAedesArea[];
   riskLevels: Record<string, RiskLevel>;
   assessments: Record<string, RiskAssessment>;
+  snapshot?: PublicDataSnapshot;
+};
+
+export type MapAssessmentSelection = {
+  subzone: PlanningSubzone;
+  assessment: RiskAssessment;
+  snapshot: PublicDataSnapshot;
 };
 
 // Loading either succeeds or returns an error.
@@ -80,6 +88,7 @@ export class RiskMapControl {
           highAedesAreas: snapshot.highAedesAreas,
           riskLevels,
           assessments: assessmentsBySubzone,
+          snapshot,
         },
       };
     } catch {
@@ -90,6 +99,14 @@ export class RiskMapControl {
   // Find an area using its subzone ID.
   async selectSubzone(id: string, subzones: SubzoneBoundary[]) {
     return subzones.find((zone) => zone.subzoneId === id) ?? null;
+  }
+
+  // Open the result using the exact assessment and data already shown on the map.
+  getSelectedAssessment(id: string, data: MapData): MapAssessmentSelection | null {
+    const subzone = data.snapshot?.subzones.find((zone) => zone.subzoneId === id);
+    const assessment = data.assessments[id];
+    if (!subzone || !assessment || !data.snapshot) return null;
+    return { subzone, assessment, snapshot: data.snapshot };
   }
 
   // Ticket #22: display the largest contributions, without changing P1's scores.

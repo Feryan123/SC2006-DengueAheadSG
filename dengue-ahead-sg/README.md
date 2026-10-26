@@ -119,6 +119,22 @@ with the required SLA attribution. Subzone outlines come from
 [URA's Master Plan 2019 dataset](https://data.gov.sg/datasets/d_8594ae9ff96d0c708bc2af633048edfb/view),
 available under the [Singapore Open Data Licence](https://data.gov.sg/open-data-licence).
 
+## App navigation
+
+`App` uses a `Screen` union for Home, Map, Result, Simulation, Prevention and
+unavailable-data screens. It stores the selected subzone and assessment from
+the screen callbacks. Opening a map result passes the assessment and snapshot
+already displayed on that map, without requesting another calculation.
+
+The start-up code can supply `locationControl`, `mapControl`, `preventionControl`
+and `simulationControl` as props. For home assessments, `publicSnapshot` must
+be the same snapshot used by the location control. Simulation keeps that original
+snapshot and baseline. Missing controls or data show an unavailable screen with
+working return actions. Home clears the previous assessment.
+
+Screen components own their forms and result content; `App` connects their
+callbacks and provides the shared navigation, data-source credits and disclaimer.
+
 ## Project structure
 
 The code follows the **Entity–Control–Boundary** pattern from our class diagram. Every class in the diagram has exactly one file, and each file starts with a header comment saying which class and use case it traces to and what is left to implement.
