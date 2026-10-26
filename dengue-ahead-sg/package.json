@@ -12,11 +12,13 @@
     "build-static": "tsx scripts/build-static.ts"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "tsx": "^4.23.15",
+    "jsdom": "^29.1.1",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.5"
@@ -24,6 +26,7 @@
   "dependencies": {
     "@turf/turf": "^7.4.0",
     "@types/geojson": "^7946.0.16",
+    "leaflet": "^1.9.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   }

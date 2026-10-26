@@ -33,6 +33,85 @@ All commands below are run inside `dengue-ahead-sg/` (the folder with `package.j
 | `npm run build` | Type-check (`tsc`) and build to `dist/` |
 | `npm run preview` | Serve the built `dist/` locally |
 | `npx tsc --noEmit` | Type-check only — run before every commit |
+| `npm test -- --run` | Run the tests once, without watch mode |
+
+## OneMap search proxy (ticket #55)
+
+`api/onemap-search.ts` is a server-only Vercel function. It supports the geocoding
+service boundary used by location assessment. The frontend adapter, coordinate
+parsing and subzone lookup are P2's ticket #14.
+
+Proposed integration endpoint: `GET /api/onemap-search?searchVal=200640`.
+It accepts an address or postal code, trims whitespace, and requests the first
+OneMap search page with coordinates and address details. P2 still needs to review
+this interface before integration.
+
+| Response | Meaning |
+|---|---|
+| `200`, with `found`, `totalNumPages`, `pageNum`, `results` | Search succeeded. No match means `found: 0` and `results: []`. |
+| `400`, with `error` | Search text is missing or empty. |
+| `405`, with `error` | Only GET is supported. |
+| `503`, with `error` | Configuration, authentication or the OneMap service is unavailable. |
+
+Results keep OneMap's string fields, including `ADDRESS`, `POSTAL`, `LATITUDE`
+and `LONGITUDE`. The proxy does not select a result or identify a subzone. Only
+address fields and pagination are returned; authentication responses and private
+upstream errors are never sent to the frontend. Responses use `Cache-Control: no-store`.
+
+### Private configuration
+
+`.env.example` contains empty `ONEMAP_EMAIL` and `ONEMAP_PASSWORD` placeholders.
+Set the real values privately in the server runtime's environment. A local
+`.env.local` file is ignored by Git, but the function does not load it by itself;
+the server runtime must load it. Never use `VITE_*` for these credentials: those
+variables are public in the frontend build. Do not copy an access token into code.
+
+The function obtains its own token, checks OneMap's expiry timestamp, reuses the
+token in memory and renews it 60 seconds early. It also renews once after HTTP 401
+or a token error inside HTTP 200. A second rejection returns 503 and discards that
+token. Each upstream request has a 10-second timeout. The cache belongs to one
+running server instance; a cold start or another instance obtains its own token.
+
+### Local checks and remaining integration
+
+`npm run dev` runs the frontend only. Vite does **not** serve this Vercel API route,
+so requesting `/api/onemap-search` from Vite is not a live proxy test. No extra
+local server or deployment tooling has been added for this ticket.
+
+Run the proxy tests without real credentials:
+
+```bash
+npm test -- --run tests/onemap-search.test.ts
+npx tsc --noEmit
+npm run build
+```
+
+The automated tests simulate OneMap replies and do not contact OneMap. A separate
+local Node.js HTTP check also verified real searches, token reuse and renewal
+after OneMap rejected a test token. Expiry timing is checked by the automated
+tests. P2 frontend integration and Vercel deployment are still pending.
+
+Recorded test results: [ticket #55](../testing/tests/ticket-55.md).
+
+Official references: [authentication](https://www.onemap.gov.sg/apidocs/authentication),
+[search](https://www.onemap.gov.sg/apidocs/search),
+[token errors](https://www.onemap.gov.sg/apidocs/docs/verifyingsearchapitoken),
+and [Vercel Node.js functions](https://vercel.com/docs/functions/runtimes/node-js).
+
+## Risk map
+
+Open **Risk Map** from the menu. Select a subzone by clicking its outline,
+searching its name or using the area list. Purple dashed lines mark subzones;
+the selected area has a solid bright pink outline.
+
+The legend shows four risk levels, from light blue (Low) to dark blue (Very High).
+Grey means no risk assessment is available; it does not mean Low risk. Map and
+result colours share `src/boundary/riskLevelStyle.ts`.
+
+Leaflet displays [OneMap tiles](https://www.onemap.gov.sg/docs/maps/index.html)
+with the required SLA attribution. Subzone outlines come from
+[URA's Master Plan 2019 dataset](https://data.gov.sg/datasets/d_8594ae9ff96d0c708bc2af633048edfb/view),
+available under the [Singapore Open Data Licence](https://data.gov.sg/open-data-licence).
 
 ## Project structure
 
@@ -79,11 +158,11 @@ Dependency rule: `boundary → control → entity / services`. Boundaries never 
 - **Type-only imports use `import type`** (required by `verbatimModuleSyntax`), and local imports include the extension: `import type { RiskAssessment } from './RiskAssessment.ts';`
 - **Mocks first.** Build against `services/mocks/` so nobody needs API keys to work. Swap in the real service once the feature works end to end.
 - **Keep the header comment** at the top of each file up to date. Remove items from its `TO IMPLEMENT` list as you implement them.
-- **Never commit secrets.** Put API keys in `.env.local` (ignored by git) and read them with `import.meta.env.VITE_*`.
+- **Never commit secrets.** Keep private keys and credentials in server-only environment variables. `.env.local` is ignored by Git. Only deliberately public frontend configuration may use `import.meta.env.VITE_*`.
 
 ## Contributing
 
-1. Pull the latest `main`, then create a branch: `git checkout -b feature/<use-case>-<short-name>`.
+1. With a clean working tree, run `git fetch origin`, then create your ticket branch from `origin/master`: `git switch -c <name>/<feature> origin/master`.
 2. Make your changes, run `npx tsc --noEmit` and `npm run build`.
 3. Push and open a pull request; ask one teammate to review before merging.
 
