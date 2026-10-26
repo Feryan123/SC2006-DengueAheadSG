@@ -23,11 +23,7 @@ const DATASTORE_DATASETS: Record<string, string> = {
 };
 
 // 4. Real-time weather API endpoints (REFRESHED EVERY TIME)
-const REALTIME_ENDPOINTS: string[] = [
-    // "airTemperature",
-    // "rainfall",
-    // "relativeHumidity"
-];
+const REALTIME_ENDPOINTS: string[] = [];
 
 /**
  * Helper to check how many hours ago a file was last modified and committed in git.
@@ -40,6 +36,20 @@ function getFileAgeInHours(filePath: string): number {
         return (Date.now() - commitTimeMs) / (1000 * 60 * 60);
     } catch {
         return 999; 
+    }
+}
+
+/**
+ * Safely parse JSON files with a fallback if the content is raw text/CSV or malformed.
+ */
+function parseSafely(filePath: string, fallback: any = {}): any {
+    if (!fs.existsSync(filePath)) return fallback;
+    try {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        return JSON.parse(raw);
+    } catch {
+        console.warn(`[Warning] Could not parse JSON from ${filePath}. File content might be raw text/CSV.`);
+        return fallback;
     }
 }
 
@@ -133,15 +143,15 @@ async function syncAllData(): Promise<void> {
             throw new Error("Missing required committed file: data/derived/weatherBaselines.json");
         }
 
-        const subzonesData = JSON.parse(fs.readFileSync(subzonesPath, 'utf8'));
-        const weatherBaselines = JSON.parse(fs.readFileSync(weatherBaselinesPath, 'utf8'));
+        const subzonesData = parseSafely(subzonesPath, []);
+        const weatherBaselines = parseSafely(weatherBaselinesPath, { humidity: { byMonth: {} }, rainfall: { byMonth: {} } });
 
-        // Load dynamic GeoJSON files
+        // Load dynamic GeoJSON files safely
         const dengueClustersPath = path.join(dynamicDir, 'dengueClusters.json');
         const highAedesPath = path.join(dynamicDir, 'highAedesAreas.json');
 
-        const dengueGeoJson = fs.existsSync(dengueClustersPath) ? JSON.parse(fs.readFileSync(dengueClustersPath, 'utf8')) : { features: [] };
-        const aedesGeoJson = fs.existsSync(highAedesPath) ? JSON.parse(fs.readFileSync(highAedesPath, 'utf8')) : { features: [] };
+        const dengueGeoJson = parseSafely(dengueClustersPath, { features: [] });
+        const aedesGeoJson = parseSafely(highAedesPath, { features: [] });
 
         // 1. Perform Turf.js polygon spatial join & aedes ratio calculations
         const subzoneMetrics = processSubzoneSpatialJoin(subzonesData, dengueGeoJson, aedesGeoJson);
@@ -152,9 +162,8 @@ async function syncAllData(): Promise<void> {
 
         function evaluateMonthlyFreshness(filePath: string): 'FRESH' | 'STALE' | 'FAILED' {
             try {
-                if (!fs.existsSync(filePath)) return 'FAILED';
-                const fileContent = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                // Handles both direct array and { result: { records } } structures
+                const fileContent = parseSafely(filePath, null);
+                if (!fileContent) return 'FAILED';
                 const records = fileContent?.result?.records || (Array.isArray(fileContent) ? fileContent : []);
                 if (records.length === 0) return 'STALE';
 
@@ -194,17 +203,39 @@ async function syncAllData(): Promise<void> {
             status: 'FRESH'
         };
 
-        // Extract latest rainfall record for weather inclusion
-        let latestRainfallRecord = null;
-        if (fs.existsSync(rainfallMonthlyPath)) {
-            try {
-                const rainfallContent = JSON.parse(fs.readFileSync(rainfallMonthlyPath, 'utf8'));
-                const records = rainfallContent?.result?.records || (Array.isArray(rainfallContent) ? rainfallContent : []);
-                if (records.length > 0) {
-                    latestRainfallRecord = records[records.length - 1];
-                }
-            } catch {}
-        }
+        // Parse records safely for WeatherProfile construction
+        const rainfallContent = parseSafely(rainfallMonthlyPath, {});
+        const humidityContent = parseSafely(relativeHumidityMonthlyPath, {});
+        const rainfallRecords = rainfallContent?.result?.records || (Array.isArray(rainfallContent) ? rainfallContent : []);
+        const humidityRecords = humidityContent?.result?.records || (Array.isArray(humidityContent) ? humidityContent : []);
+
+        // Rainfall (2-3 months back lag)
+        const targetRainfallIndex = Math.max(0, rainfallRecords.length - 3);
+        const rainfallRecord = rainfallRecords[targetRainfallIndex] || {};
+        const rainfallMonthStr = String(rainfallRecord.month || rainfallRecord.date || rainfallRecord.yearMonth || '2026-07');
+        const rainfallCalendarMonth = rainfallMonthStr.slice(-2);
+        const rainfallBaseline = weatherBaselines?.rainfall?.byMonth?.[rainfallCalendarMonth] || { mean: 0, sd: 0 };
+
+        // Humidity (latest complete month)
+        const humidityRecord = humidityRecords[humidityRecords.length - 1] || {};
+        const humidityMonthStr = String(humidityRecord.month || humidityRecord.date || humidityRecord.yearMonth || '2026-09');
+        const humidityCalendarMonth = humidityMonthStr.slice(-2);
+        const humidityBaseline = weatherBaselines?.humidity?.byMonth?.[humidityCalendarMonth] || { mean: 0, sd: 0 };
+
+        const weatherProfile = {
+            humidityMonth: humidityMonthStr,
+            meanHumidityPct: Number(humidityRecord.value || humidityRecord.humidity || humidityRecord.mean || 0),
+            humidityNormalMean: humidityBaseline.mean,
+            humidityNormalSd: humidityBaseline.sd,
+            rainfallMonth: rainfallMonthStr,
+            rainfallMm: Number(rainfallRecord.value || rainfallRecord.rainfall || rainfallRecord.total || 0),
+            rainfallNormalMean: rainfallBaseline.mean,
+            rainfallNormalSd: rainfallBaseline.sd
+        };
+
+        // Load population profiles safely
+        const popDensityPath = path.join(staticDir, 'ds2020PopulationDensity.json');
+        const populationProfilesData = parseSafely(popDensityPath, []);
 
         // 3. VALIDATION GUARD: Reject empty arrays or all-zero metrics
         const hasValidMetrics = Array.isArray(subzoneMetrics) && 
@@ -217,12 +248,12 @@ async function syncAllData(): Promise<void> {
 
         // 4. Publish Final PublicDataSnapshot matching required schema
         const finalSnapshot = {
-            lastUpdated: new Date().toISOString(),
+            generatedAt: new Date().toISOString(),
             datasets: datasetsStatus,
-            weather: {
-                latestRainfallMonth: latestRainfallRecord
-            },
-            weatherBaselines,
+            weather: weatherProfile,
+            populationProfiles: populationProfilesData,
+            dengueClusters: dengueGeoJson,
+            highAedesAreas: aedesGeoJson,
             subzones: subzoneMetrics
         };
 
@@ -231,7 +262,7 @@ async function syncAllData(): Promise<void> {
 
         // Also write master manifest for backward compatibility
         const masterManifestPath = path.join(process.cwd(), 'snapshot.json');
-        fs.writeFileSync(masterManifestPath, JSON.stringify({ lastUpdated: new Date().toISOString(), ...results }, null, 4));
+        fs.writeFileSync(masterManifestPath, JSON.stringify({ generatedAt: new Date().toISOString(), ...results }, null, 4));
 
         console.log("Successfully completed data sync, polygon spatial join, freshness checks, and snapshot publication!");
 

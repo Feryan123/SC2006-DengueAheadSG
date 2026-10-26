@@ -22,6 +22,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
+
+      - name: Get current date for daily cache key
+        id: date
+        run: echo "CURRENT_DATE=$(date -u +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: Cache dynamic monthly datasets
+        uses: actions/cache@v4
+        with:
+          path: dengue-ahead-sg/data/dynamic
+          key: dynamic-monthly-datasets-${{ runner.os }}-${{ env.CURRENT_DATE }}
+          restore-keys: |
+            dynamic-monthly-datasets-${{ runner.os }}-
 
       - run: npm ci
 
