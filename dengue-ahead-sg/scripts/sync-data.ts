@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { DataGovSgAdapter } from '../src/services/DataGovSgAdapter.ts';
 import { processSubzoneSpatialJoin } from '../src/services/turf.ts'; 
+import * as turf from '@turf/turf';
 
 // 1. Static historical datasets (Downloaded ONCE and cached forever)
 const STATIC_DATASETS = [
@@ -53,6 +54,19 @@ function parseSafely(filePath: string, fallback: any = {}): any {
         console.warn(`[Warning] Could not parse JSON from ${filePath}. File content might be raw text/CSV.`);
         return fallback;
     }
+}
+
+/** subzoneId whose boundary contains the feature's centroid; falls back to the first subzone it overlaps. */
+function findSubzoneId(geometry: any, subzones: any[]): string | null {
+    const centre = turf.centroid(geometry);
+
+    const containing = subzones.find(sz => turf.booleanPointInPolygon(centre, sz.boundary));
+    if (containing) return containing.subzoneId;
+
+    const overlapping = subzones.find(sz => turf.booleanIntersects(geometry, sz.boundary));
+    if (overlapping) return overlapping.subzoneId;
+
+    return null;
 }
 
 async function syncAllData(): Promise<void> {
@@ -245,57 +259,39 @@ async function syncAllData(): Promise<void> {
         // 3. Map to Entity Definitions
         const retrievedTimestamp = new Date().toISOString();
 
-        // Build a lookup map of subzone areas from subzones.json for density calculation
-        const subzoneAreaMap = new Map<string, number>();
-        (subzonesData || []).forEach((sz: any) => {
-            const id = sz.subzoneId || sz.id || sz.name;
-            const area = sz.areaKm2 || 1;
-            if (id) {
-                subzoneAreaMap.set(String(id).toUpperCase(), Number(area));
-                if (sz.name) subzoneAreaMap.set(String(sz.name).toUpperCase(), Number(area));
-            }
-        });
-
-        // Map population profiles to PopulationProfile[] entities
-        const popDensityPath = path.join(staticDir, 'ds2020PopulationDensity.json');
-        const popContent = parseSafely(popDensityPath, null);
-        const populationProfilesData = (popContent?.result?.records || (Array.isArray(popContent) ? popContent : []))
-            .filter((r: any) => r.Number && r.Number !== "Total") // Skip the aggregate nationwide total row if present
-            .map((r: any) => {
-                const subzoneNameOrId = String(r.Number || '').trim();
-                const rawTotal = r.Total_Total;
-                const residentCount = (rawTotal === '-' || !rawTotal) ? 0 : Number(rawTotal);
-                const validResidentCount = isNaN(residentCount) ? 0 : residentCount;
-
-                // Look up subzone area to calculate correct density
-                const areaKm2 = subzoneAreaMap.get(subzoneNameOrId.toUpperCase()) || 1;
-                const computedDensity = validResidentCount / areaKm2;
-                
-                return {
-                    subzoneId: subzoneNameOrId,
-                    residentCount: validResidentCount,
-                    density: Number(computedDensity.toFixed(2)),
-                    housingComposition: String(r.housingComposition || 'HDB / Mixed')
-                };
-            });
+        // PopulationProfile[]: subzones.json (Ticket 11) already has residents and density per subzoneId
+        const populationProfilesData = subzonesData.map((sz: any) => ({
+            subzoneId: sz.subzoneId,
+            residentCount: sz.residentCount,
+            density: sz.residentsPerKm2,
+            housingComposition: ''
+        }));
 
         // DengueCluster[]
-        const dengueClustersData = (dengueGeoJson?.features || []).map((f: any, idx: number) => ({
-            clusterId: String(f.id || f.properties?.ID || f.properties?.cluster_id || `cluster-${idx}`),
-            location: String(f.properties?.LOCATION || f.properties?.location || 'Unknown Location'),
-            caseCount: Number(f.properties?.CASE_SIZE || f.properties?.case_size || 0),
+        const dengueClustersData = (dengueGeoJson?.features || []).map((f: any) => ({
+            clusterId: String(f.properties.OBJECTID),
+            location: f.properties.LOCALITY ?? '',
+            caseCount: Number(f.properties.CASE_SIZE),
             geometry: f.geometry,
             retrievedAt: retrievedTimestamp,
-            subzoneId: String(f.properties?.subzoneId || f.properties?.subzone_id || '')
-        }));
+            subzoneId: findSubzoneId(f.geometry, subzonesData),
+        })).filter((c: any) => {
+            if (c.subzoneId) return true;
+            console.warn(`Cluster ${c.clusterId} is outside every subzone; skipped`);
+            return false;
+        });
 
         // HighAedesArea[]
-        const highAedesAreasData = (aedesGeoJson?.features || []).map((f: any, idx: number) => ({
-            areaId: String(f.id || f.properties?.ID || f.properties?.area_id || `aedes-${idx}`),
+        const highAedesAreasData = (aedesGeoJson?.features || []).map((f: any) => ({
+            areaId: String(f.properties.OBJECTID),
             geometry: f.geometry,
             retrievedAt: retrievedTimestamp,
-            subzoneId: String(f.properties?.subzoneId || f.properties?.subzone_id || '')
-        }));
+            subzoneId: findSubzoneId(f.geometry, subzonesData),
+        })).filter((a: any) => {
+            if (a.subzoneId) return true;
+            console.warn(`High Aedes area ${a.areaId} is outside every subzone; skipped`);
+            return false;
+        });
 
         // 4. VALIDATION GUARD: Reject empty arrays or all-zero metrics
         const hasValidMetrics = Array.isArray(subzoneMetrics) && 
