@@ -1,4 +1,8 @@
 import fs from 'fs';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
+
+const streamPipeline = promisify(pipeline);
 
 export class DataGovSgAdapter {
     private apiKey: string;
@@ -14,6 +18,32 @@ export class DataGovSgAdapter {
         };
     }
 
+    /**
+     * Helper to execute a fetch request with exponential backoff and jitter.
+     */
+    private async fetchWithRetry(url: string, options: RequestInit = {}, maxRetries = 3, baseDelayMs = 1000): Promise<Response> {
+        let lastError: any;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const res = await fetch(url, options);
+                // Retry on server errors (5xx) or rate limits (429)
+                if (!res.ok && (res.status >= 500 || res.status === 429)) {
+                    throw new Error(`HTTP Error: ${res.status} ${res.statusText}`);
+                }
+                return res;
+            } catch (err: any) {
+                lastError = err;
+                if (attempt === maxRetries) {
+                    break;
+                }
+                const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 500;
+                console.warn(`[DataGovSgAdapter] Fetch failed for ${url} (Attempt ${attempt + 1}/${maxRetries + 1}): ${err.message}. Retrying in ${Math.round(delay)}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        throw new Error(`Failed to fetch ${url} after ${maxRetries + 1} attempts. Last error: ${lastError?.message}`);
+    }
+
     // 1. Real-time API endpoints
     public async fetchRealtime(endpointName: string): Promise<any> {
         const endpoints: Record<string, string> = {
@@ -27,19 +57,16 @@ export class DataGovSgAdapter {
             throw new Error(`Unknown real-time endpoint: ${endpointName}`);
         }
 
-        const res = await fetch(url, { headers: this.getHeaders() });
-        if (!res.ok) {
-            throw new Error(`Failed to fetch real-time ${endpointName}: HTTP ${res.status}`);
-        }
+        const res = await this.fetchWithRetry(url, { headers: this.getHeaders() });
         return await res.json();
     }
 
-    // 2. Stream-based Poll-Download workflow (Bypasses V8 memory string size limits for large files)
+    // 2. Stream-based Poll-Download workflow with backoff
     public async fetchPollDownloadToDisk(datasetId: string, outputPath: string): Promise<void> {
         const initUrl = `https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/initiate-download`;
         const pollUrl = `https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/poll-download`;
 
-        const initRes = await fetch(initUrl, { headers: this.getHeaders() });
+        const initRes = await this.fetchWithRetry(initUrl, { headers: this.getHeaders() });
         const initJson = await initRes.json();
         
         if (initJson.code !== 0) {
@@ -48,7 +75,7 @@ export class DataGovSgAdapter {
 
         let fileUrl: string | null = null;
         for (let attempt = 0; attempt < 5; attempt++) {
-            const pollRes = await fetch(pollUrl, { headers: this.getHeaders() });
+            const pollRes = await this.fetchWithRetry(pollUrl, { headers: this.getHeaders() });
             const pollJson = await pollRes.json();
             
             if (pollJson.code === 0 && pollJson.data?.url) {
@@ -62,24 +89,14 @@ export class DataGovSgAdapter {
             throw new Error(`Polling timed out or failed to return URL for dataset ${datasetId}`);
         }
 
-        const fileRes = await fetch(fileUrl);
-        if (!fileRes.ok) {
-            throw new Error(`Failed to download payload file for dataset ${datasetId}: HTTP ${fileRes.status}`);
+        const fileRes = await this.fetchWithRetry(fileUrl);
+
+        if (!fileRes.body) {
+            throw new Error(`Response body is missing for dataset ${datasetId}`);
         }
 
         const fileStream = fs.createWriteStream(outputPath);
-        await new Promise((resolve, reject) => {
-            if (!fileRes.body) {
-                return reject(new Error(`Response body is missing for dataset ${datasetId}`));
-            }
-            import('stream').then(({ pipeline }) => {
-                // @ts-ignore
-                pipeline(fileRes.body, fileStream, (err) => {
-                    if (err) reject(err);
-                    else resolve(true);
-                });
-            });
-        });
+        await streamPipeline(fileRes.body as any, fileStream);
     }
 
     // 3. Datastore Search wrapper
@@ -87,15 +104,11 @@ export class DataGovSgAdapter {
         return await this.fetchPollDownloadToDisk(resourceId, outputPath);
     }
 
-    // 3. Datastore Search / CSV Fetcher (For tabular datasets)
+    // 4. Datastore Search / CSV Fetcher (For tabular datasets)
     public async fetchDatastoreRecords(resourceId: string, outputPath: string, limit: number = 50000): Promise<void> {
         const searchUrl = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&limit=${limit}`;
         
-        const res = await fetch(searchUrl, { headers: this.getHeaders() });
-        if (!res.ok) {
-            throw new Error(`Failed to fetch datastore records for ${resourceId}: HTTP ${res.status}`);
-        }
-
+        const res = await this.fetchWithRetry(searchUrl, { headers: this.getHeaders() });
         const json = await res.json();
         fs.writeFileSync(outputPath, JSON.stringify(json, null, 4));
     }

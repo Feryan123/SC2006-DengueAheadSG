@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { DataGovSgAdapter } from '../src/services/DataGovSgAdapter.ts';
 import { processSubzoneSpatialJoin } from '../src/services/turf.ts'; 
 
@@ -9,13 +10,13 @@ const STATIC_DATASETS = [
     { key: "subzonesBoundary", id: "d_8594ae9ff96d0c708bc2af633048edfb" }
 ];
 
-// 2. Dynamic Poll-Download Datasets (GeoJSON spatial bundles)
+// 2. Dynamic Poll-Download Datasets (GeoJSON spatial bundles - Refreshed HOURLY)
 const POLL_DOWNLOAD_DATASETS: Record<string, string> = {
     dengueClusters: "d_dbfabf16158d1b0e1c420627c0819168",
     highAedesAreas: "d_5d060d8b7838a15e8906fb22c50dbf51"
 };
 
-// 3. Dynamic Datastore / CSV Datasets (Monthly tabular statistics)
+// 3. Dynamic Datastore / CSV Datasets (Monthly tabular statistics - Refreshed DAILY / 24 hours)
 const DATASTORE_DATASETS: Record<string, string> = {
     rainfallMonthly: "d_b16d06b83473fdfcc92ed9d37b66ba58",
     relativeHumidityMonthly: "d_e3b1111a26b2aefef4f386c068d4ca5d"
@@ -27,6 +28,21 @@ const REALTIME_ENDPOINTS: string[] = [
     // "rainfall",
     // "relativeHumidity"
 ];
+
+/**
+ * Helper to check how many hours ago a file was last modified and committed in git.
+ * This allows an hourly GitHub Action to intelligently throttle weather fetches to once every 24 hours.
+ */
+function getFileAgeInHours(filePath: string): number {
+    try {
+        const timestampStr = execSync(`git log -1 --format=%ct -- "${filePath}"`, { encoding: 'utf8' }).trim();
+        if (!timestampStr) return 999; // Untracked files are treated as old / needing sync
+        const commitTimeMs = parseInt(timestampStr, 10) * 1000;
+        return (Date.now() - commitTimeMs) / (1000 * 60 * 60);
+    } catch {
+        return 999; // Fallback if git history isn't available or command fails
+    }
+}
 
 async function syncAllData(): Promise<void> {
     try {
@@ -65,7 +81,7 @@ async function syncAllData(): Promise<void> {
         // B. Handle Dynamic Datasets
         const dynamicManifest: Record<string, string> = {};
 
-        // B1. Poll-Download streams
+        // B1. Poll-Download streams (Always fetch latest every hourly run)
         for (const [key, datasetId] of Object.entries(POLL_DOWNLOAD_DATASETS)) {
             const filePath = path.join(dynamicDir, `${key}.json`);
             console.log(`[Dynamic Poll] Fetching latest live data for: ${key}...`);
@@ -73,11 +89,26 @@ async function syncAllData(): Promise<void> {
             dynamicManifest[key] = path.relative(process.cwd(), filePath);
         }
 
-        // B2. Datastore search queries (Rainfall & Humidity)
+        // B2. Datastore search queries (Rainfall & Humidity - Refreshed DAILY via Git age check)
         for (const [key, datasetId] of Object.entries(DATASTORE_DATASETS)) {
             const filePath = path.join(dynamicDir, `${key}.json`);
-            console.log(`[Dynamic Datastore] Fetching records for: ${key}...`);
-            await adapter.fetchDatastoreRecords(datasetId, filePath);
+            let needsRefresh = true;
+
+            if (fs.existsSync(filePath)) {
+                const ageHours = getFileAgeInHours(filePath);
+                if (ageHours < 24) {
+                    console.log(`[Dynamic Datastore] Skipping fetch for ${key} (last updated in git ${ageHours.toFixed(1)} hours ago)`);
+                    needsRefresh = false;
+                }
+            }
+
+            if (needsRefresh) {
+                console.log(`[Dynamic Datastore] Fetching fresh records for: ${key}...`);
+                await adapter.fetchDatastoreRecords(datasetId, filePath);
+            } else {
+                console.log(`[Dynamic Datastore] Using cached records for: ${key}`);
+            }
+
             dynamicManifest[key] = path.relative(process.cwd(), filePath);
         }
         results.dynamicData = dynamicManifest;
@@ -115,10 +146,8 @@ async function syncAllData(): Promise<void> {
         let incidentPoints: Array<{ lat: number; lng: number }> = [];
 
         if (Array.isArray(dengueFileContent)) {
-            // Case A: Already a flat array
             incidentPoints = dengueFileContent;
         } else if (dengueFileContent && Array.isArray(dengueFileContent.features)) {
-            // Case B: GeoJSON FeatureCollection format (extracting [lng, lat] from geometry)
             incidentPoints = dengueFileContent.features.map((f: any) => {
                 const coords = f.geometry?.coordinates;
                 return {
@@ -127,7 +156,6 @@ async function syncAllData(): Promise<void> {
                 };
             }).filter((pt: any) => pt.lat != null && pt.lng != null);
         } else if (dengueFileContent && Array.isArray(dengueFileContent.data)) {
-            // Case C: Wrapped in a .data property
             incidentPoints = dengueFileContent.data;
         }
 
