@@ -23,6 +23,33 @@ function factor(factorType: RiskFactorType, contribution: number): RiskFactorCon
 }
 
 describe('RiskMapControl', () => {
+  it('opens a selection using the displayed assessment and snapshot without another request', async () => {
+    const snapshot = await new MockPublicDataService().retrievePublicData();
+    const item = assessment(snapshot.subzones[0].subzoneId, RiskLevel.High);
+    const retrievePublicData = vi.fn().mockResolvedValue(snapshot);
+    const assessAll = vi.fn().mockResolvedValue([item]);
+    const control = new RiskMapControl({ retrievePublicData }, { assessAll });
+    const result = await control.loadRiskMap();
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
+    const selection = control.getSelectedAssessment(item.subzoneId, result.data);
+    expect(selection?.assessment).toBe(item);
+    expect(selection?.subzone).toBe(snapshot.subzones[0]);
+    expect(selection?.snapshot).toBe(snapshot);
+    expect(retrievePublicData).toHaveBeenCalledOnce();
+    expect(assessAll).toHaveBeenCalledOnce();
+  });
+
+  it('does not invent result details for an unknown, unassessed or outline-only area', async () => {
+    const snapshot = await new MockPublicDataService().retrievePublicData();
+    const item = assessment(snapshot.subzones[0].subzoneId, RiskLevel.Low);
+    const control = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => [item] });
+    const result = await control.loadRiskMap();
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
+    expect(control.getSelectedAssessment('unknown', result.data)).toBeNull();
+    expect(control.getSelectedAssessment(snapshot.subzones[1].subzoneId, result.data)).toBeNull();
+    expect(control.getSelectedAssessment(item.subzoneId, { ...result.data, snapshot: undefined })).toBeNull();
+  });
+
   it('passes one snapshot to assessAll and matches all four levels by area ID', async () => {
     const snapshot = await new MockPublicDataService().retrievePublicData();
     const [low, moderate, high, veryHigh] = snapshot.subzones;

@@ -64,6 +64,29 @@ function button(label: string) {
 }
 
 describe('Risk map', () => {
+  it('keeps the map and view when the parent supplies a new result callback', async () => {
+    const leaflet = await import('leaflet');
+    const fitBounds = vi.spyOn(leaflet.Map.prototype, 'fitBounds');
+    const { snapshot, control } = await mapWithAssessments();
+    const firstAction = vi.fn();
+    const latestAction = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={firstAction} />));
+    const path = container.querySelector('path.leaflet-interactive')!;
+    await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const popupAction = button('View full assessment');
+    const viewChanges = fitBounds.mock.calls.length;
+
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={latestAction} />));
+    expect(container.querySelector('path[stroke="#e600a9"]')).toBe(path);
+    expect(button('View full assessment')).toBe(popupAction);
+    expect(container.querySelector('select')?.value).toBe(snapshot.subzones[0].subzoneId);
+    expect(fitBounds).toHaveBeenCalledTimes(viewChanges);
+    await act(async () => popupAction.click());
+    expect(firstAction).not.toHaveBeenCalled();
+    expect(latestAction).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
+      expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
+  });
+
   it('draws polygons with the four assessment colours and leaves missing assessments grey', async () => {
     const { snapshot, control } = await mapWithAssessments();
     await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
@@ -88,7 +111,8 @@ describe('Risk map', () => {
     expect(path.getAttribute('stroke')).toBe('#e600a9');
     expect(path.getAttribute('stroke-dasharray')).toBeNull();
     await act(async () => button('View Assessment').click());
-    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId);
+    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
+      expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
   });
 
   it('uses dashed purple boundaries and restores them when another area is selected', async () => {
@@ -161,7 +185,8 @@ describe('Risk map', () => {
     await act(async () => paths[0].dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(container.querySelector('.map-summary .risk-pill')?.textContent).toBe('Low');
     await act(async () => button('View Assessment').click());
-    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(boundaries[0].subzoneId);
+    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(boundaries[0].subzoneId,
+      expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
   });
 
   it('searches by area name and clears selection when no area matches', async () => {
@@ -238,7 +263,8 @@ describe('Map details (ticket #22)', () => {
       'Lagged rainfall: 25.0 points', 'Humidity: 20.0 points', 'Population density: 15.0 points',
     ]);
     await act(async () => button('View full assessment').click());
-    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId);
+    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
+      expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
   });
 
   it('shows unavailable details and disables the result action for an unassessed area', async () => {

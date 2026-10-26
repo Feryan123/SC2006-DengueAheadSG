@@ -10,6 +10,7 @@ import { createSubzonePopup } from './SubzonePopup.ts';
 import {
   RiskMapControl,
   type MapResult,
+  type MapAssessmentSelection,
   type OverlayName,
   type OverlayState,
 } from '../control/RiskMapControl.ts';
@@ -17,7 +18,7 @@ import {
 const defaultControl = new RiskMapControl();
 
 type Props = {
-  onRequestAssessment: (subzoneId: string) => void;
+  onRequestAssessment: (subzoneId: string, selection?: MapAssessmentSelection) => void;
   control?: RiskMapControl;
 };
 
@@ -31,10 +32,16 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
   const mapElement = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const areaLayers = useRef<{ id: string; layer: L.GeoJSON }[]>([]);
+  const assessmentAction = useRef(onRequestAssessment);
   const [overlays, setOverlays] = useState<OverlayState>({
     dengueClusters: false,
     highAedesAreas: false,
   });
+
+  // Keep the latest button action without rebuilding the map.
+  useEffect(() => {
+    assessmentAction.current = onRequestAssessment;
+  }, [onRequestAssessment]);
 
   // Ask the controller for map data when this screen opens.
   useEffect(() => {
@@ -81,7 +88,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
         tooltip.textContent = `${zone.name} — ${style.label}`;
         layer.bindTooltip(tooltip);
         const assessment = data?.assessments[zone.subzoneId];
-        layer.bindPopup(createSubzonePopup(zone, assessment, control.getTopFactors(assessment), onRequestAssessment));
+        layer.bindPopup(createSubzonePopup(zone, assessment, control.getTopFactors(assessment), requestAssessment));
         layer.on('click', () => setSelectedId(zone.subzoneId));
         layer.addTo(leafletMap);
         areaLayers.current.push({ id: zone.subzoneId, layer });
@@ -100,7 +107,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
       map.current = null;
       areaLayers.current = [];
     };
-  }, [data, control, onRequestAssessment]);
+  }, [data, control]);
 
   useEffect(() => {
     if (!selectedId) map.current?.closePopup();
@@ -118,7 +125,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
         area.layer.openPopup();
       }
     }
-  }, [selectedId, data, control, onRequestAssessment]);
+  }, [selectedId, data, control]);
 
   async function selectSubzone(id: string) {
     const zone = await control.selectSubzone(id, data?.subzones ?? []);
@@ -140,8 +147,9 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
     // TODO: Show or hide this overlay on the Leaflet map.
   }
 
-  function requestAssessment() {
-    if (selectedId && data?.riskLevels[selectedId]) onRequestAssessment(selectedId);
+  function requestAssessment(id: string) {
+    const selection = data ? control.getSelectedAssessment(id, data) : null;
+    if (data?.riskLevels[id]) assessmentAction.current(id, selection ?? undefined);
   }
 
   return (
@@ -168,7 +176,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
           <div className="card map-summary">
             <div><strong>Planning Subzone: {selectedZone?.name ?? 'Not selected'}</strong><p className="muted small">Choose a subzone to view its assessment.</p></div>
             <span className="risk-pill" style={{ backgroundColor: selectedStyle.colour, color: selectedStyle.textColour }}>{selectedStyle.label}</span>
-            <button className="primary" disabled={!selectedId || !data?.riskLevels[selectedId]} onClick={requestAssessment}>View Assessment</button>
+            <button className="primary" disabled={!selectedId || !data?.riskLevels[selectedId]} onClick={() => requestAssessment(selectedId)}>View Assessment</button>
           </div>
           <section className="card map-ranking" aria-label="Top 10 subzones">
             <h2>Top 10 subzones</h2>
