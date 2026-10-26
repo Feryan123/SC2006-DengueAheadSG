@@ -8,9 +8,6 @@
   --teal: #0e8a84;
   --border: #d9e2e6;
   --muted: #5d6b73;
-  --risk-low: #247a48;
-  --risk-moderate: #9a6b00;
-  --risk-high: #d85a19;
 }
 
 * { box-sizing: border-box; }
@@ -73,9 +70,11 @@ input::placeholder { color: #8a9aa3; }
 .map-heading .muted { font-size: 14px; }
 .map-search { flex: 0 1 520px; }
 .map-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr); gap: 24px; }
-.map-placeholder { position: relative; border-radius: 24px; border: 1px solid var(--border); min-height: 375px; background: #eef3f5; overflow: hidden; }
-.map-note { position: absolute; top: 12px; left: 12px; background: #ffffffeb; border-radius: 6px; padding: 7px 10px; color: var(--muted); font-size: 11px; }
-.map-empty { position: absolute; bottom: 14px; left: 14px; background: #ffffffeb; border-radius: 6px; padding: 7px 10px; color: #173b55; font-size: 12px; }
+.risk-map { height: 420px; border-radius: 18px; border: 1px solid var(--border); background: #eef3f5; z-index: 0; }
+.risk-map:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+/* Follow the area shape for focus instead of drawing a rectangle around it. */
+.risk-map path.leaflet-interactive:focus { outline: none; }
+.risk-map path.leaflet-interactive:focus-visible { stroke: #e600a9; stroke-width: 3; stroke-opacity: 1; stroke-dasharray: none; }
 .map-summary { margin-top: 2px; padding: 18px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .map-summary > div { flex: 1; }
 .map-summary p { margin: 7px 0 0; }
@@ -84,9 +83,6 @@ input::placeholder { color: #8a9aa3; }
 .map-side h3 { margin: 24px 0 14px; }
 .map-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 11px; }
 .risk-pill { font-size: 12px; padding: 6px 13px; border-radius: 20px; font-weight: 700; }
-.risk-low { color: var(--risk-low); background: #ddf5e7; }
-.risk-moderate { color: var(--risk-moderate); background: #fff1c2; }
-.risk-high { color: var(--risk-high); background: #ffe2cc; }
 .toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #173b55; font-size: 13px; margin: 15px 0; }
 .toggle-row input { accent-color: var(--teal); width: 18px; height: 18px; }
 .dropdown-label { display: block; margin-top: 18px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
@@ -123,5 +119,5 @@ input::placeholder { color: #8a9aa3; }
   .feature-grid, .prevention-grid { grid-template-columns: 1fr; }
   .map-heading { flex-direction: column; }
   .map-search { flex: initial; width: 100%; }
-  .map-placeholder { min-height: 300px; }
+  .risk-map { height: 330px; }
 }
