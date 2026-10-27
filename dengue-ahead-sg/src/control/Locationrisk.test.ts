@@ -1,7 +1,3 @@
-/**
- * Tests for #14: GeocodingMapServiceBoundary (OneMapAdapter) + LocationRiskControl
- * Traces to UC-1 / UC-3 / UC-5. Assumes Vitest; swap the import if the repo uses Jest.
- */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import {
     GeocodingMapServiceBoundary,
