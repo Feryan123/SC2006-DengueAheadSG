@@ -32,6 +32,8 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
   const mapElement = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const areaLayers = useRef<{ id: string; layer: L.GeoJSON }[]>([]);
+  const clusterLayer = useRef<L.GeoJSON | null>(null);
+  const aedesLayer = useRef<L.GeoJSON | null>(null);
   const assessmentAction = useRef(onRequestAssessment);
   const [overlays, setOverlays] = useState<OverlayState>({
     dengueClusters: false,
@@ -101,13 +103,89 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
       setMapError('Area boundaries could not be displayed. Please try again later.');
     }
 
+    // Create separate layers for dengue clusters and high-Aedes areas.
+    const clusters = L.geoJSON(
+      data?.dengueClusters.map((cluster) => ({
+        type: 'Feature' as const,
+        properties: {
+          location: cluster.location,
+          caseCount: cluster.caseCount,
+        },
+        geometry: cluster.geometry,
+      })) ?? [],
+      {
+        style: {
+          color: '#dc2626',
+          weight: 2,
+          fillColor: '#ef4444',
+          fillOpacity: 0.35,
+        },
+        pointToLayer: (_feature, latlng) =>
+          L.circleMarker(latlng, {
+            radius: 7,
+            color: '#dc2626',
+            fillColor: '#ef4444',
+            fillOpacity: 0.8,
+          }),
+      },
+    );
+
+    const aedes = L.geoJSON(
+      data?.highAedesAreas.map((area) => ({
+        type: 'Feature' as const,
+        properties: { areaId: area.areaId },
+        geometry: area.geometry,
+      })) ?? [],
+      {
+        style: {
+          color: '#d97706',
+          weight: 2,
+          fillColor: '#f59e0b',
+          fillOpacity: 0.35,
+        },
+        pointToLayer: (_feature, latlng) =>
+          L.circleMarker(latlng, {
+            radius: 7,
+            color: '#d97706',
+            fillColor: '#f59e0b',
+            fillOpacity: 0.8,
+          }),
+      },
+    );
+
+    clusterLayer.current = clusters;
+    aedesLayer.current = aedes;
+
     // Remove Leaflet's map and listeners when this screen closes or its data changes.
     return () => {
       leafletMap.remove();
       map.current = null;
       areaLayers.current = [];
+      clusterLayer.current = null;
+      aedesLayer.current = null;
     };
   }, [data, control]);
+
+  // Show or hide overlays without recreating the Leaflet map.
+  useEffect(() => {
+    const leafletMap = map.current;
+    if (!leafletMap) return;
+
+    const layers = [
+      { layer: clusterLayer.current, visible: overlays.dengueClusters },
+      { layer: aedesLayer.current, visible: overlays.highAedesAreas },
+    ];
+
+    for (const { layer, visible } of layers) {
+      if (!layer) continue;
+
+      if (visible && !leafletMap.hasLayer(layer)) {
+        leafletMap.addLayer(layer);
+      } else if (!visible && leafletMap.hasLayer(layer)) {
+        leafletMap.removeLayer(layer);
+      }
+    }
+  }, [overlays, data]);
 
   useEffect(() => {
     if (!selectedId) map.current?.closePopup();
@@ -144,7 +222,6 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
 
   async function toggleOverlay(name: OverlayName) {
     setOverlays(await control.updateOverlay(overlays, name));
-    // TODO: Show or hide this overlay on the Leaflet map.
   }
 
   function requestAssessment(id: string) {
@@ -210,13 +287,17 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
           <h3>Overlays</h3>
           <label className="toggle-row">
             <span>Confirmed clusters</span>
-            <input type="checkbox" disabled checked={overlays.dengueClusters} onChange={() => void toggleOverlay('dengueClusters')} />
+            <input type="checkbox" disabled={!data?.dengueClusters.length} checked={overlays.dengueClusters} onChange={() => void toggleOverlay('dengueClusters')} />
           </label>
           <label className="toggle-row">
             <span>High Aedes count areas</span>
-            <input type="checkbox" disabled checked={overlays.highAedesAreas} onChange={() => void toggleOverlay('highAedesAreas')} />
+            <input type="checkbox" disabled={!data?.highAedesAreas.length} checked={overlays.highAedesAreas} onChange={() => void toggleOverlay('highAedesAreas')} />
           </label>
-          <p className="muted small">Overlays are not available yet.</p>
+          <p className="muted small">
+  {!data
+    ? 'Overlay data is unavailable.'
+    : `Available overlays: ${data.dengueClusters.length} dengue clusters and ${data.highAedesAreas.length} high-Aedes areas.`}
+</p>
 
           <label className="dropdown-label" htmlFor="subzone">Planning Subzone</label>
           <select id="subzone" disabled={!data} value={selectedId} onChange={(event) => void selectSubzone(event.target.value)}>
