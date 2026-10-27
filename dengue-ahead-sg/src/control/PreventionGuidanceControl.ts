@@ -72,7 +72,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // MODERATE RISK (2 tips)
   {
     taskId: 'tip_level_moderate_1',
-    actionText: 'Increase Mozzie Wipeout checks to every alternate day',
+    actionText: 'Increase Mozzie Wipeout checks to every 3 days',
     explanation:
       'Because Aedes mosquitoes can complete their breeding cycle in about 7 days, checking and emptying water-bearing containers every alternate day stops larvae from maturing into adult mosquitoes.',
     riskLevels: [RiskLevel.Moderate],
@@ -110,7 +110,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
     taskId: 'tip_level_very_high_1',
     actionText: 'Take extra precautions daily: Wear long-sleeved tops and long pants (S-A-W)',
     explanation:
-      'In Very High risk areas, take extra personal precautions by wearing light-coloured, long-sleeved shirts and long trousers alongside regular repellent application, especially during peak biting hours after dawn and before dusk.',
+      'In Very High risk areas, take extra personal precautions by wearing long-sleeved shirts and long trousers alongside regular repellent application, especially during peak biting hours after dawn and before dusk.',
     riskLevels: [RiskLevel.VeryHigh],
     sourceUrl: NEA_SAW_URL,
   },
@@ -118,7 +118,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
     taskId: 'tip_level_very_high_2',
     actionText: 'Take extra precautions: Perform daily stagnant-water checks and indoor spraying',
     explanation:
-      'Combine daily B-L-O-C-K stagnant-water removal with S-A-W protective actions (Spray insecticide in dark corners, Apply repellent regularly, Wear covered clothing) and install window screens where possible.',
+      'Combine daily B-L-O-C-K stagnant-water removal with S-A-W protective actions (Spray insecticide in dark corners, Apply repellent regularly, Wear covered clothing) and install mosquito screens where possible.',
     riskLevels: [RiskLevel.VeryHigh],
     sourceUrl: NEA_SAW_URL,
   },
@@ -163,9 +163,9 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // 4. Humidity
   {
     taskId: 'tip_factor_humidity',
-    actionText: 'Humid conditions: Inspect indoor trays and air-conditioner condensate pans',
+    actionText: 'Humid conditions: Inspect indoor trays and containers',
     explanation:
-      'Elevated humidity prolongs adult Aedes mosquito survival and activity. Check air-conditioner trays, refrigerator drip pans, and bathroom receptacles every alternate day to prevent indoor breeding.',
+      'Elevated humidity prolongs adult Aedes mosquito survival and activity. Check kitchen trays and bathroom receptacles every alternate day to prevent indoor breeding.',
     riskLevels: [],
     triggerFactor: RiskFactorType.Humidity,
     minContributionLevel: ContributionLevel.Moderate,
