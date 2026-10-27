@@ -6,8 +6,9 @@
  * Simulation uses a copy of the public data snapshot and reuses
  * RiskAssessmentControl.generateAssessment() for risk calculation.
  *
- * Provisional adjustment rule (pending team confirmation):
- * DECREASE = -20%, NO_CHANGE = 0%, INCREASE = +20%.
+ * Adjustment rule:
+ * - Humidity and lagged rainfall: +/- 1 normal standard deviation.
+ * - High-Aedes overlap: provisional +/- 20% (Ticket 42).
  */
 
 import {
@@ -107,14 +108,15 @@ export class RiskSimulationControl {
     }
 
     for (const adjustment of adjustments) {
-      const multiplier = this.getMultiplier(
+      const direction = this.getDirection(
         adjustment.adjustmentLevel,
       );
 
       switch (adjustment.factorType) {
         case AdjustableRiskFactorType.Humidity:
           simulatedSnapshot.weather.meanHumidityPct = this.clamp(
-            snapshot.weather.meanHumidityPct * multiplier,
+            snapshot.weather.meanHumidityPct +
+              direction * snapshot.weather.humidityNormalSd,
             0,
             100,
           );
@@ -123,13 +125,17 @@ export class RiskSimulationControl {
         case AdjustableRiskFactorType.LaggedRainfall:
           simulatedSnapshot.weather.rainfallMm = Math.max(
             0,
-            snapshot.weather.rainfallMm * multiplier,
+            snapshot.weather.rainfallMm +
+              direction * snapshot.weather.rainfallNormalSd,
           );
           break;
 
         case AdjustableRiskFactorType.HighAedesArea:
+          // TODO(Ticket 42): Replace the provisional +/- 20% rule
+          // with the team-approved High-Aedes adjustment rule.
           simulatedSubzone.aedesOverlapRatio = this.clamp(
-            targetSubzone.aedesOverlapRatio * multiplier,
+            targetSubzone.aedesOverlapRatio *
+              this.getMultiplier(adjustment.adjustmentLevel),
             0,
             1,
           );
@@ -181,6 +187,17 @@ export class RiskSimulationControl {
       ...remainingScenario,
       adjustments: [],
     };
+  }
+
+  private getDirection(level: AdjustmentLevel): number {
+    switch (level) {
+      case AdjustmentLevel.Decrease:
+        return -1;
+      case AdjustmentLevel.Increase:
+        return 1;
+      case AdjustmentLevel.NoChange:
+        return 0;
+    }
   }
 
   private getMultiplier(level: AdjustmentLevel): number {

@@ -9,7 +9,8 @@ import {
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import type { SimulationScenario } from '../entity/SimulationScenario.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
-import type { RiskAssessmentControl } from './RiskAssessmentControl.ts';
+import { MockPublicDataService } from '../services/mocks/MockPublicDataService.ts';
+import { RiskAssessmentControl } from './RiskAssessmentControl.ts';
 import { RiskSimulationControl } from './RiskSimulationControl.ts';
 
 const baseline = {
@@ -114,7 +115,7 @@ describe('RiskSimulationControl', () => {
     ).toBe(false);
   });
 
-  it('applies adjustments and preserves the original snapshot', async () => {
+  it('applies standard deviation adjustments and preserves the original snapshot', async () => {
     const { control, generateAssessment } = makeControl();
     const snapshot = makeSnapshot();
     const original = structuredClone(snapshot);
@@ -148,8 +149,13 @@ describe('RiskSimulationControl', () => {
       assessmentType: AssessmentType.Simulated,
     });
 
-    expect(simulatedSnapshot.weather.meanHumidityPct).toBe(84);
+    // Humidity: 70 + 5 SD = 75.
+    expect(simulatedSnapshot.weather.meanHumidityPct).toBe(75);
+
+    // Rainfall: 100 - 20 SD = 80.
     expect(simulatedSnapshot.weather.rainfallMm).toBe(80);
+
+    // High-Aedes remains provisional +/- 20% (Ticket 42).
     expect(simulatedSnapshot.subzones[0].aedesOverlapRatio).toBeCloseTo(0.6);
 
     expect(snapshot).toEqual(original);
@@ -185,7 +191,7 @@ describe('RiskSimulationControl', () => {
     const { control, generateAssessment } = makeControl();
     const snapshot = makeSnapshot();
 
-    snapshot.weather.meanHumidityPct = 95;
+    snapshot.weather.meanHumidityPct = 98;
     snapshot.subzones[0].aedesOverlapRatio = 0.95;
 
     await control.recalculateScenario(
@@ -291,5 +297,61 @@ describe('RiskSimulationControl', () => {
 
     expect(scenario.adjustments).toHaveLength(1);
     expect(scenario.simulatedAssessmentId).toBe('simulated-1');
+  });
+
+  it('changes real risk index in the correct direction for humidity +/- 1 SD', async () => {
+    // Integration test: real data service and real factor calculators.
+    // Do not mock generateAssessment().
+    const snapshot = await new MockPublicDataService().retrievePublicData();
+    const assessmentControl = new RiskAssessmentControl();
+    const simulationControl = new RiskSimulationControl(assessmentControl);
+
+    const subzoneId = snapshot.subzones[0].subzoneId;
+    const realBaseline = await assessmentControl.generateAssessment(
+      subzoneId,
+      snapshot,
+    );
+
+    expect(realBaseline).not.toBeNull();
+
+    if (!realBaseline) {
+      throw new Error('Real baseline assessment could not be generated');
+    }
+
+    const increase = await simulationControl.recalculateScenario(
+      realBaseline,
+      [
+        {
+          factorType: AdjustableRiskFactorType.Humidity,
+          adjustmentLevel: AdjustmentLevel.Increase,
+        },
+      ],
+      snapshot,
+    );
+
+    const decrease = await simulationControl.recalculateScenario(
+      realBaseline,
+      [
+        {
+          factorType: AdjustableRiskFactorType.Humidity,
+          adjustmentLevel: AdjustmentLevel.Decrease,
+        },
+      ],
+      snapshot,
+    );
+
+    expect(increase.simulated.assessmentType).toBe(
+      AssessmentType.Simulated,
+    );
+    expect(decrease.simulated.assessmentType).toBe(
+      AssessmentType.Simulated,
+    );
+
+    expect(increase.simulated.riskIndex).toBeGreaterThan(
+      realBaseline.riskIndex,
+    );
+    expect(decrease.simulated.riskIndex).toBeLessThan(
+      realBaseline.riskIndex,
+    );
   });
 });
