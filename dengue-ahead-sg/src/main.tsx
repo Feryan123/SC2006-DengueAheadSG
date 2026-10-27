@@ -1,10 +1,17 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './style.css'
-import App from './App.tsx'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import { initializeApplication } from './Startup.ts';
+import './style.css';
 
-createRoot(document.getElementById('app')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+async function main() {
+  const { appProps } = await initializeApplication();
+
+  createRoot(document.getElementById('app')!).render(
+    <StrictMode>
+      <App {...appProps} />
+    </StrictMode>,
+  );
+}
+
+void main();
