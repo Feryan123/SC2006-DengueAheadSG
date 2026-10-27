@@ -16,6 +16,7 @@
  * Relationships: implements ApprovedPublicDataServiceBoundary
  */
 
+import { centroid } from '@turf/turf';
 import { DatasetStatus } from '../../entity/enums.ts';
 import type { DengueCluster } from '../../entity/DengueCluster.ts';
 import type { HighAedesArea } from '../../entity/HighAedesArea.ts';
@@ -50,6 +51,13 @@ function findRealSubzone(name: string) {
   }
 
   return subzone;
+}
+
+/** Create a mock square centred on a real subzone's centroid. */
+function boxAtSubzoneCentre(name: string, half: number): Geometry {
+  const boundary = findRealSubzone(name).boundary as Geometry;
+  const [lng, lat] = centroid(boundary).geometry.coordinates;
+  return box(lng, lat, half);
 }
 
 const SUBZONES: PlanningSubzone[] = [
@@ -126,7 +134,7 @@ function buildSnapshot(retrievedAt: string): PublicDataSnapshot {
     retrievedAt, subzoneId: findRealSubzone('TAMPINES EAST').subzoneId },
   { areaId: 'MOCK-A2', geometry: box(103.957, 1.351, 0.002),
     retrievedAt, subzoneId: findRealSubzone('TAMPINES EAST').subzoneId },
-  { areaId: 'MOCK-A3', geometry: box(103.838, 1.428, 0.002),
+  { areaId: 'MOCK-A3', geometry: boxAtSubzoneCentre('YISHUN EAST', 0.002),
     retrievedAt, subzoneId: findRealSubzone('YISHUN EAST').subzoneId },
   { areaId: 'MOCK-A4', geometry: box(103.843, 1.433, 0.002),
     retrievedAt, subzoneId: findRealSubzone('YISHUN EAST').subzoneId },
@@ -134,7 +142,7 @@ function buildSnapshot(retrievedAt: string): PublicDataSnapshot {
     retrievedAt, subzoneId: findRealSubzone('YISHUN EAST').subzoneId },
   { areaId: 'MOCK-A6', geometry: box(103.929, 1.329, 0.002),
     retrievedAt, subzoneId: findRealSubzone('BEDOK NORTH').subzoneId },
-  { areaId: 'MOCK-A7', geometry: box(103.794, 1.439, 0.002),
+  { areaId: 'MOCK-A7', geometry: boxAtSubzoneCentre('WOODLANDS EAST', 0.002),
     retrievedAt, subzoneId: findRealSubzone('WOODLANDS EAST').subzoneId },
   { areaId: 'MOCK-A8', geometry: box(103.797, 1.442, 0.0015),
     retrievedAt, subzoneId: findRealSubzone('WOODLANDS EAST').subzoneId },
