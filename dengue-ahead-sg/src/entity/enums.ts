@@ -43,6 +43,7 @@ export const DataConfidence = {
   High: 'HIGH',
   Medium: 'MEDIUM',
   Low: 'LOW',
+  Unavailable: 'UNAVAILABLE'
 } as const;
 export type DataConfidence = (typeof DataConfidence)[keyof typeof DataConfidence];
 

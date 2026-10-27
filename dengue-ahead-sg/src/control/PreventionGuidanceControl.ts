@@ -11,8 +11,10 @@
  * - Reads PreventionChecklist, PreventionTask
  */
 
+import type { PlanningSubzone } from '../entity/PlanningSubzone.ts';
 import type { PreventionChecklist } from '../entity/PreventionChecklist.ts'
 import type { PreventionTask } from '../entity/PreventionTask.ts'
+import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import {
     ContributionLevel,
     RiskFactorType,
@@ -30,6 +32,12 @@ const NEA_PREVENT_URL = 'https://www.nea.gov.sg/dengue-zika/prevent-aedes-mosqui
 const NEA_SAW_URL = 'https://www.nea.gov.sg/dengue-zika/stop-dengue-now';
 const NEA_CLUSTERS_URL = 'https://www.nea.gov.sg/dengue-zika/dengue/dengue-clusters';
 const NEA_GRAVITRAP_URL = 'https://www.nea.gov.sg/dengue-zika/Aedes';
+
+const CONTRIBUTION_RANK: Record <ContributionLevel, number> = {
+  [ContributionLevel.Low]: 1,
+  [ContributionLevel.Moderate]: 2,
+  [ContributionLevel.High]: 3
+}
 
 export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // GENERAL TIPS (Empty riskLevels = applicable at any level)
@@ -72,7 +80,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // MODERATE RISK (2 tips)
   {
     taskId: 'tip_level_moderate_1',
-    actionText: 'Increase Mozzie Wipeout checks to every 3 days',
+    actionText: 'Conduct Mozzie Wipeout checks every alternate day',
     explanation:
       'Because Aedes mosquitoes can complete their breeding cycle in about 7 days, checking and emptying water-bearing containers every alternate day stops larvae from maturing into adult mosquitoes.',
     riskLevels: [RiskLevel.Moderate],
@@ -194,32 +202,151 @@ export const BUNDLED_PREVENTION_CHECKLIST: PreventionChecklist = {
 };
 
 export class PreventionGuidanceControl {
-    private readonly checkList: PreventionChecklist
+  private readonly checkList: PreventionChecklist
 
-    constructor(checkList: PreventionChecklist = BUNDLED_PREVENTION_CHECKLIST){
-        this.checkList = checkList
+  constructor(checkList: PreventionChecklist = BUNDLED_PREVENTION_CHECKLIST) {
+    this.checkList = checkList
+  }
+
+  /** Load the bundled checklist and fill any supported local placeholders. */
+  public async loadChecklist(): Promise<PreventionChecklist> {
+    if (!Array.isArray(this.checkList.tasks) || this.checkList.tasks.length === 0)
+      throw new Error("Prevention guidance is currently unavailable.")
+
+    return {
+      ...this.checkList,
+      tasks: this.checkList.tasks.map((task) =>
+        this.fillLocalDetails(task, "your area"),
+      ),
     }
-    //Loads the PreventionChecklist and its tasks
-    public async loadChecklist(): Promise<PreventionChecklist> {
-        if (!this.checkList || !Array.isArray(this.checkList.tasks) || this.checkList.tasks.length === 0)
-            throw new Error('Prevention guidance is currently unavailable')
-        return this.checkList
+  }
+
+  /** Return the selected task and its source information, or null if not found. */
+  public async showTaskDetails(taskId: string): Promise<TaskDetails | null> {
+    if (!taskId || !Array.isArray(this.checkList.tasks))
+      return null
+
+    const foundTask = this.checkList.tasks.find((task) => task.taskId === taskId)
+    if (!foundTask) {
+      return null
     }
 
-    //Returns the selected task's explanation and source information.
-    public async showTaskDetails(taskId: string): Promise<TaskDetails | null> {
-        if (!taskId || !this.checkList || !Array.isArray(this.checkList.tasks))
-            return null
+    const formattedTask = this.fillLocalDetails(foundTask, "your area")
 
-        const foundTask = this.checkList.tasks.find((task) => task.taskId === taskId)
-        if (!foundTask)
-            return null
+    return {
+      task: formattedTask,
+      sourceName: this.checkList.sourceName,
+      sourceVersion: this.checkList.sourceVersion,
+      sourceReference: foundTask.sourceUrl || this.checkList.sourceReference,
+    };
+  }
 
-        return {
-            task: foundTask,
-            sourceName: this.checkList.sourceName,
-            sourceVersion: this.checkList.sourceVersion,
-            sourceReference: foundTask.sourceUrl || this.checkList.sourceReference
-        }
+  /**
+   * Generate tips for a particular risk assessment.
+   * General tips are always included when an assessment is available;
+   * matching risk-level tips and tips for the two strongest contributors
+   * are added after them.
+   */
+
+  public async generateTips(
+    assessment: RiskAssessment | null | undefined,
+    subzone?: Pick<PlanningSubzone, "subzoneId" | "name"> | string | null,
+  ): Promise<PreventionTask[]> {
+    const subzoneNameFromArgument =
+      typeof subzone === "string"
+        ? subzone.trim()
+        : subzone != null
+          ? subzone.name?.trim()
+          : ""
+    const resolvedSubzoneName =
+      subzoneNameFromArgument || assessment?.subzoneId?.trim() || "your area"
+
+    const generalTips = this.checkList.tasks
+      .filter((task) => task.riskLevels.length === 0 && !task.triggerFactor)
+      .map((task) => this.fillLocalDetails(task, resolvedSubzoneName))
+
+    if (!assessment || String(assessment.dataConfidence).toUpperCase() === "UNAVAILABLE")
+      return generalTips
+
+    const selectedTips: PreventionTask[] = []
+    const seenTaskIds = new Set<string>()
+
+    const addTipIfUnique = (
+      task: PreventionTask,
+      factorDetail?: string,
+    ): void => {
+      if (seenTaskIds.has(task.taskId))
+        return
+
+      seenTaskIds.add(task.taskId)
+      selectedTips.push(
+        this.fillLocalDetails(task, resolvedSubzoneName, factorDetail),
+      )
     }
+
+    // Add tasks that match the assessed risk level.
+    // Factor-specific tasks are handled separately so they can be checked against contributions.
+    for (const task of this.checkList.tasks) {
+      if (!task.triggerFactor && task.riskLevels.length > 0 &&
+        task.riskLevels.includes(assessment.riskLevel)
+      )
+        addTipIfUnique(task)
+    }
+
+    // Pick the two strongest contributors and add eligible factor-specific tips.
+    const topTwoContributors = [...(assessment.contributions ?? [])]
+      .sort((a, b) => b.contribution - a.contribution)
+      .slice(0, 2)
+
+    for (const contributor of topTwoContributors) {
+      const contributorRank = CONTRIBUTION_RANK[contributor.contributionLevel] ?? 0
+
+      for (const task of this.checkList.tasks) {
+        if (task.triggerFactor !== contributor.factorType)
+          continue
+
+        if (task.riskLevels.length > 0 && !task.riskLevels.includes(assessment.riskLevel))
+          continue
+
+        const requiredRank = task.minContributionLevel
+          ? CONTRIBUTION_RANK[task.minContributionLevel]
+          : 1
+
+        if (contributorRank >= requiredRank) 
+          addTipIfUnique(task, contributor.explanation)
+      }
+    }
+
+    // Keep general prevention guidance even when tailored tips are available.
+    return [...generalTips, ...selectedTips]
+  }
+
+  private fillLocalDetails(
+    task: PreventionTask,
+    subzoneName: string,
+    factorDetails?: string,
+  ): PreventionTask {
+    const cleanDetail =
+      factorDetails?.trim() ||
+      `elevated ${task.triggerFactor ?? "risk factor"} score in ${subzoneName}`
+
+    const explanation = task.explanation
+      .replaceAll("{subzone}", subzoneName)
+      .replaceAll("({factorDetail})", factorDetails ? ` (${cleanDetail})` : '')
+      .replaceAll("{factorDetail}", cleanDetail)
+
+    // Bundled task explanations do not all contain a {factorDetail} placeholder.
+    // Append the contributor's explanation so it is still shown when available.
+    const explanationWithContext = factorDetails?.trim()
+      ? `${explanation} Why this tip is relevant: ${cleanDetail}`
+      : explanation;
+
+    return {
+      ...task,
+      actionText: task.actionText.replaceAll("{subzone}", subzoneName),
+      explanation: explanationWithContext
+    }
+  }
 }
+
+export default PreventionGuidanceControl;
