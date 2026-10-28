@@ -105,13 +105,13 @@ private explain(factorType: RiskFactorType, { inputValue, score }: FactorResult)
     case RiskFactorType.Humidity:
       return `Humidity ${inputValue.toFixed(1)}% scores ${s}/100 against the 2014–2025 normal`;
     case RiskFactorType.LaggedRainfall:
-      return `Rainfall of ${Math.round(inputValue)} mm scores ${s}/100 against the 2014–2025 normal`;
+      return `Rainfall of ${Math.round(inputValue)} mm scores ${s}/100 against the 1991–2020 normal`;
     case RiskFactorType.DengueClusters:
       return `${inputValue} cluster cases nearby scores ${s}/100 among subzones`;
     case RiskFactorType.HighAedesArea:
       return `${Math.round(inputValue * 100)}% overlap with high-Aedes areas scores ${s}/100 among subzones`;
     case RiskFactorType.PopulationDensity:
-      return `${Math.round(inputValue)} residents/km² scores ${s}/100 among subzones`;
+      return `${Math.round(inputValue).toLocaleString('en-SG')} residents/km² scores ${s}/100 among subzones`;
     default:
       return `${factorType} ${inputValue} scores ${s}/100`;
   }

@@ -188,6 +188,7 @@ describe('generateAssessment', () => {
 
         expect(explanation(RiskFactorType.Humidity)).toContain('Humidity 83.5%');
         expect(explanation(RiskFactorType.LaggedRainfall)).toContain('Rainfall of 213 mm');
+        expect(explanation(RiskFactorType.LaggedRainfall)).toContain('1991–2020 normal');
     });
 });
 

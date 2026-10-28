@@ -1,4 +1,4 @@
-/** One national monthly weather profile (Option A, #2). Normals are 2014–2025 for the same calendar month. */
+/** One national monthly weather profile (Option A, #2). Normals are for the same calendar month: humidity 2014–2025, rainfall 1991–2020. */
 export interface WeatherProfile {
   /** Latest complete month of humidity data, e.g. '2026-09' */
   humidityMonth: string;
