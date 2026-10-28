@@ -50,14 +50,19 @@ describe('determineRiskLevel (bands 25 / 50 / 75)', () => {
     const control = new RiskAssessmentControl();
 
     it.each([
+        [-1, RiskLevel.Low],
         [0, RiskLevel.Low],
+        [10, RiskLevel.Low],
         [24.9, RiskLevel.Low],
         [25, RiskLevel.Moderate],
+        [35, RiskLevel.Moderate],
         [49.9, RiskLevel.Moderate],
         [50, RiskLevel.High],
         [74.9, RiskLevel.High],
         [75, RiskLevel.VeryHigh],
-        [100, RiskLevel.VeryHigh]
+        [85, RiskLevel.VeryHigh],
+        [100, RiskLevel.VeryHigh],
+        [101, RiskLevel.VeryHigh]
     ])('%s → %s', (index, level) => {
         expect(control.determineRiskLevel(index)).toBe(level);
     });
@@ -171,6 +176,18 @@ describe('generateAssessment', () => {
     it('null for an unknown subzone', async () => {
         const control = new RiskAssessmentControl(fakes(60));
         expect(await control.generateAssessment('NOPE', makeSnapshot())).toBeNull();
+    });
+
+    it('rounds raw humidity and rainfall values in explanations', async () => {
+        const calculators = fakes(60).map(c =>
+            c.factorType === RiskFactorType.Humidity ? { ...c, calculate: () => ({ inputValue: 83.47291, score: 60 }) }
+            : c.factorType === RiskFactorType.LaggedRainfall ? { ...c, calculate: () => ({ inputValue: 212.638, score: 60 }) }
+            : c);
+        const result = await new RiskAssessmentControl(calculators).generateAssessment('A', makeSnapshot());
+        const explanation = (f: RiskFactorType) => result?.contributions.find(c => c.factorType === f)?.explanation;
+
+        expect(explanation(RiskFactorType.Humidity)).toContain('Humidity 83.5%');
+        expect(explanation(RiskFactorType.LaggedRainfall)).toContain('Rainfall of 213 mm');
     });
 });
 

@@ -103,9 +103,9 @@ private explain(factorType: RiskFactorType, { inputValue, score }: FactorResult)
   const s = Math.round(score);
   switch(factorType){
     case RiskFactorType.Humidity:
-      return `Humidity ${inputValue}% scores ${s}/100 against the 2014–2025 normal`;
+      return `Humidity ${inputValue.toFixed(1)}% scores ${s}/100 against the 2014–2025 normal`;
     case RiskFactorType.LaggedRainfall:
-      return `Rainfall of ${inputValue} mm scores ${s}/100 against the 2014–2025 normal`;
+      return `Rainfall of ${Math.round(inputValue)} mm scores ${s}/100 against the 2014–2025 normal`;
     case RiskFactorType.DengueClusters:
       return `${inputValue} cluster cases nearby scores ${s}/100 among subzones`;
     case RiskFactorType.HighAedesArea:
