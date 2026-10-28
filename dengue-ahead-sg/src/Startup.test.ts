@@ -1,3 +1,4 @@
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { initializeApplication } from './Startup.ts';
@@ -48,15 +49,20 @@ describe('Startup dependency wiring (Ticket #8)', () => {
     expect(result.riskAssessmentControl.calculators).toHaveLength(5);
   });
 
-  it('loads the public snapshot from the injected service', async () => {
-    const mockService = new MockPublicDataService();
-    const expectedSnapshot = await mockService.retrievePublicData();
+  it('does not fetch the public snapshot during startup', async () => {
+    const retrievePublicData = vi.fn().mockImplementation(
+      () => new Promise(() => {}),
+    );
 
-    const result = await initializeApplication({
-      dataService: new MockPublicDataService(expectedSnapshot),
-    });
+    const dataService: ApprovedPublicDataServiceBoundary = {
+      retrievePublicData,
+    };
 
-    expect(result.appProps.publicSnapshot).toEqual(expectedSnapshot);
+    const result = await initializeApplication({ dataService });
+
+    expect(result.dataService).toBe(dataService);
+    expect(retrievePublicData).not.toHaveBeenCalled();
+    expect(result.appProps.publicSnapshot).toBeUndefined();
   });
 
   it('uses the injected service for map assessments', async () => {
@@ -77,10 +83,12 @@ describe('Startup dependency wiring (Ticket #8)', () => {
   });
 
   it('keeps the app initialised when public data is unavailable', async () => {
+    const retrievePublicData = vi.fn().mockRejectedValue(
+      new Error('Network unavailable'),
+    );
+
     const failingService: ApprovedPublicDataServiceBoundary = {
-      retrievePublicData: vi.fn().mockRejectedValue(
-        new Error('Network unavailable'),
-      ),
+      retrievePublicData,
     };
 
     const result = await initializeApplication({
@@ -88,6 +96,7 @@ describe('Startup dependency wiring (Ticket #8)', () => {
     });
 
     expect(result.appProps.publicSnapshot).toBeUndefined();
+    expect(retrievePublicData).not.toHaveBeenCalled();
     expect(result.appProps.mapControl).toBeInstanceOf(RiskMapControl);
     expect(result.appProps.simulationControl).toBeInstanceOf(
       RiskSimulationControl,

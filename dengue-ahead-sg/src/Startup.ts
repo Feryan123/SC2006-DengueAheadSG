@@ -1,3 +1,4 @@
+
 /**
  * Ticket #8: System start-up and dependency wiring.
  *
@@ -37,12 +38,14 @@ export interface StartupResult {
 /**
  * Creates and connects the application's shared dependencies.
  *
- * Does not use mock data by default. Production data must come from
- * the published snapshot or a valid cached/bundled fallback.
+ * Does not fetch the public snapshot during startup.
+ * Screens load data through their own controls when needed.
  */
 export async function initializeApplication(
   options: StartupOptions = {},
 ): Promise<StartupResult> {
+  // TODO (#8): Replace this URL once snapshot hosting is confirmed.
+  // The hourly sync currently writes to the data branch, not public/.
   const snapshotUrl = options.snapshotUrl ?? '/latest-snapshot.json';
 
   const dataService: ApprovedPublicDataServiceBoundary =
@@ -54,24 +57,20 @@ export async function initializeApplication(
 
   const riskAssessmentControl = new RiskAssessmentControl();
 
+  // TODO (#14): Once Ticket #14 is merged, inject dataService and
+  // riskAssessmentControl into LocationRiskControl.
   const locationControl = new LocationRiskControl();
+
   const mapControl = new RiskMapControl(
     dataService,
     riskAssessmentControl,
   );
+
   const preventionControl = new PreventionGuidanceControl();
+
   const simulationControl = new RiskSimulationControl(
     riskAssessmentControl,
   );
-
-  let publicSnapshot: PublicDataSnapshot | undefined;
-
-  try {
-    publicSnapshot = await dataService.retrievePublicData();
-  } catch {
-    // Keep the application available so its boundaries can show
-    // the appropriate unavailable-data state.
-  }
 
   return {
     dataService,
@@ -81,7 +80,6 @@ export async function initializeApplication(
       mapControl,
       preventionControl,
       simulationControl,
-      publicSnapshot,
     },
   };
 }
