@@ -29,7 +29,8 @@ vi.mock('./boundary/HomePageBoundary.tsx', () => ({
     screens.home(props);
     return (
       <section aria-label="Test home screen">
-        <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], baseline)}>Test valid location</button>
+        <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], baseline, snapshot)}>Test valid location</button>
+        <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], baseline)}>Test location without snapshot</button>
         <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], { ...baseline, subzoneId: 'wrong' })}>Test mismatched area</button>
         <button onClick={() => props.onDataUnavailable?.('Private upstream detail')}>Test failed request</button>
         <button onClick={props.onOpenMap}>Open map from home</button>
@@ -189,7 +190,7 @@ describe('App navigation (ticket 19)', () => {
 
   it('does not simulate a home assessment without its original snapshot', async () => {
     await act(async () => root.render(<App locationControl={locationControl} simulationControl={simulationControl()} />));
-    await click('Test valid location');
+    await click('Test location without snapshot');
     await click('Simulate');
     expect(container.querySelector('h1')?.textContent).toBe('Simulation unavailable');
     expect(screens.simulation).not.toHaveBeenCalled();
@@ -199,14 +200,14 @@ describe('App navigation (ticket 19)', () => {
 
   it('passes the supplied shared snapshot with a home baseline to simulation', async () => {
     const simulation = simulationControl();
-    await act(async () => root.render(<App locationControl={locationControl} publicSnapshot={snapshot} simulationControl={simulation} />));
+    await act(async () => root.render(<App locationControl={locationControl} simulationControl={simulation} />));
     await click('Test valid location');
     await click('Simulate');
     expect(screens.simulation).toHaveBeenLastCalledWith({ baseline, snapshot, simulationControl: simulation });
   });
 
   it('shows unavailable simulation when its control is missing', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} publicSnapshot={snapshot} />));
+    await act(async () => root.render(<App locationControl={locationControl} />));
     await click('Test valid location');
     await click('Simulate');
     expect(container.querySelector('h1')?.textContent).toBe('Simulation unavailable');
