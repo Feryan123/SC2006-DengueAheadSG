@@ -27,3 +27,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Raw datasets downloaded by `npm run sync` (only the snapshot files are published,
+# by the Action to the data branch; do not ignore those or the Action's git add fails)
+data/dynamic/
+data/static/
