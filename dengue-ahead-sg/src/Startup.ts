@@ -57,9 +57,10 @@ export async function initializeApplication(
 
   const riskAssessmentControl = new RiskAssessmentControl();
 
-  // TODO (#14): Once Ticket #14 is merged, inject dataService and
-  // riskAssessmentControl into LocationRiskControl.
-  const locationControl = new LocationRiskControl();
+  const locationControl = new LocationRiskControl(
+    dataService,
+    riskAssessmentControl,
+  );
 
   const mapControl = new RiskMapControl(
     dataService,
