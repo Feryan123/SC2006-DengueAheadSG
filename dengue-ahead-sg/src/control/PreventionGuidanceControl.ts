@@ -65,7 +65,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
     taskId: 'tip_level_low_1',
     actionText: 'Practice the 5-step Mozzie Wipeout once a week',
     explanation:
-      'Even when local risk is Low, Aedes mosquitoes can breed in clean, stagnant water as small as a 20-cent coin. Conduct a routine weekly check of your home to prevent new breeding habitats.',
+      'Even when local risk in {subzone} is Low, Aedes mosquitoes can breed in clean, stagnant water as small as a 20-cent coin. Conduct a routine weekly check of your home to prevent new breeding habitats.',
     riskLevels: [RiskLevel.Low],
     sourceUrl: NEA_SAW_URL,
   },
@@ -107,7 +107,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   },
   {
     taskId: 'tip_level_high_2',
-    actionText: 'Take extra precautions: spray insecticide in dark corners around your home, such as under the bed or sofa and behind curtains (S-A-W)',
+    actionText: 'Take extra precautions in {subzone}: spray insecticide in dark corners around your home, such as under the bed or sofa and behind curtains (S-A-W)',
     explanation:
       'Spraying dark corners is the first of NEA\'s three protective actions against dengue (Spray, Apply, Wear). Follow the product label; NEA has a video on using aerosol insecticide safely.',
     riskLevels: [RiskLevel.High],
@@ -117,7 +117,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // VERY HIGH RISK (2 tips)
   {
     taskId: 'tip_level_very_high_1',
-    actionText: 'Take extra precautions daily: Wear long-sleeved tops and long pants and keep applying repellent (S-A-W)',
+    actionText: 'Take extra precautions in {subzone}: Wear long-sleeved tops and long pants and keep applying repellent (S-A-W)',
     explanation:
       'Wearing long sleeves and long pants is the third of NEA\'s S-A-W actions. NEA encourages all residents, especially those living in dengue cluster areas, to do all three.',
     riskLevels: [RiskLevel.VeryHigh],
@@ -148,7 +148,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // 2. High-Aedes Area
   {
     taskId: 'tip_factor_aedes',
-    actionText: 'Do the Mozzie Wipeout regularly, and remind family, friends and neighbours to remove stagnant water around their homes',
+    actionText: 'Do the Mozzie Wipeout regularly in {subzone}, and remind family, friends and neighbours to remove stagnant water around their homes',
     explanation:
       'NEA\'s Gravitrap surveillance detects areas with a higher Aedes aegypti population, and NEA urges residents there to practise the Mozzie Wipeout regularly. NEA also reminds that low risk does not mean no risk.',
     riskLevels: [],
@@ -245,8 +245,8 @@ export class PreventionGuidanceControl {
   /**
    * Generate tips for a particular risk assessment.
    * General tips are always included when an assessment is available;
-   * matching risk-level tips and tips for the two strongest contributors
-   * are added after them.
+   * Matching risk-level tips come first, then tips for the two strongest contributors,
+   * then the general tips that apply at any level.
    */
 
   public async generateTips(
@@ -319,7 +319,7 @@ export class PreventionGuidanceControl {
     }
 
     // Keep general prevention guidance even when tailored tips are available.
-    return [...generalTips, ...selectedTips]
+    return [...selectedTips, ...generalTips]
   }
 
   private fillLocalDetails(
