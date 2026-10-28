@@ -64,6 +64,66 @@ function button(label: string) {
 }
 
 describe('Risk map', () => {
+  it('toggles dengue cluster and high-Aedes overlays without recreating the map', async () => {
+    const { control } = await mapWithAssessments();
+
+    await act(async () => {
+      root.render(
+        <RiskMapBoundary
+          control={control}
+          onRequestAssessment={() => {}}
+        />,
+      );
+    });
+
+    const mapElement = container.querySelector('.leaflet-container');
+    const checkboxes = [
+      ...container.querySelectorAll<HTMLInputElement>(
+        'input[type="checkbox"]',
+      ),
+    ];
+
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0].disabled).toBe(false);
+    expect(checkboxes[1].disabled).toBe(false);
+
+    const countOverlayPaths = (colour: string) =>
+      container.querySelectorAll(`path[stroke="${colour}"]`).length;
+
+    expect(countOverlayPaths('#dc2626')).toBe(0);
+    expect(countOverlayPaths('#d97706')).toBe(0);
+
+    await act(async () => {
+      checkboxes[0].click();
+    });
+
+    expect(checkboxes[0].checked).toBe(true);
+    expect(countOverlayPaths('#dc2626')).toBeGreaterThan(0);
+
+    await act(async () => {
+      checkboxes[1].click();
+    });
+
+    expect(checkboxes[1].checked).toBe(true);
+    expect(countOverlayPaths('#d97706')).toBeGreaterThan(0);
+
+    await act(async () => {
+      checkboxes[0].click();
+    });
+
+    expect(checkboxes[0].checked).toBe(false);
+    expect(countOverlayPaths('#dc2626')).toBe(0);
+    expect(countOverlayPaths('#d97706')).toBeGreaterThan(0);
+
+    await act(async () => {
+      checkboxes[1].click();
+    });
+
+    expect(checkboxes[1].checked).toBe(false);
+    expect(countOverlayPaths('#d97706')).toBe(0);
+
+    expect(container.querySelector('.leaflet-container')).toBe(mapElement);
+  });
   it('keeps the map and view when the parent supplies a new result callback', async () => {
     const leaflet = await import('leaflet');
     const fitBounds = vi.spyOn(leaflet.Map.prototype, 'fitBounds');
