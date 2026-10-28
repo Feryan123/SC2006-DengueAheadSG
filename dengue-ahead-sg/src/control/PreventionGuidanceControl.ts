@@ -266,7 +266,7 @@ export class PreventionGuidanceControl {
       .filter((task) => task.riskLevels.length === 0 && !task.triggerFactor)
       .map((task) => this.fillLocalDetails(task, resolvedSubzoneName))
 
-    if (!assessment || String(assessment.dataConfidence).toUpperCase() === "UNAVAILABLE")
+    if (!assessment)
       return generalTips
 
     const selectedTips: PreventionTask[] = []
