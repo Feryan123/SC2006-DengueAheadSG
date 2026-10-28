@@ -1,3 +1,14 @@
+/**
+ * Traces to: SimulationBoundary (<<boundary>>) in class diagram
+ * Related use case(s): UC-4 Simulate Risk Scenario
+ *
+ * One slider per adjustable factor, from a large decrease to a large increase
+ * (5 steps, No change in the middle). The comparison updates as soon as a
+ * slider moves. Steps are labelled with the % change for this area, never
+ * with model terms such as standard deviations.
+ *
+ * Calls: RiskSimulationControl
+ */
 
 import { useEffect, useState } from 'react';
 import {
@@ -5,9 +16,10 @@ import {
   AdjustmentLevel,
 } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
-import type {
-  RiskSimulationControl,
-  SimulationResult,
+import {
+  ADJUSTMENT_STEPS,
+  type RiskSimulationControl,
+  type SimulationResult,
 } from '../control/RiskSimulationControl.ts';
 import type { ScenarioAdjustment } from '../entity/ScenarioAdjustment.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
@@ -19,32 +31,28 @@ export interface SimulationBoundaryProps {
   simulationControl: RiskSimulationControl;
 }
 
-const factors = [
+type FactorType = ScenarioAdjustment['factorType'];
+type Level = ScenarioAdjustment['adjustmentLevel'];
+
+const factors: readonly { type: FactorType; label: string; format: (value: number) => string }[] = [
   {
     type: AdjustableRiskFactorType.Humidity,
     label: 'Humidity',
-    description: 'Adjust by one normal standard deviation.',
+    format: (value) => `${value.toFixed(1)}%`,
   },
   {
     type: AdjustableRiskFactorType.LaggedRainfall,
-    label: 'Lagged rainfall',
-    description: 'Adjust by one normal standard deviation.',
+    label: 'Rainfall 2–3 months ago',
+    format: (value) => `${Math.round(value)} mm`,
   },
   {
     type: AdjustableRiskFactorType.HighAedesArea,
-    label: 'High-Aedes area overlap',
-    description: 'Adjust by a provisional 20%.',
+    label: 'Area overlapping high-Aedes zones',
+    format: (value) => `${Math.round(value * 100)}% of the area`,
   },
-] as const;
+];
 
-const levels = [
-  { value: AdjustmentLevel.Decrease, label: 'Decrease' },
-  { value: AdjustmentLevel.NoChange, label: 'No change' },
-  { value: AdjustmentLevel.Increase, label: 'Increase' },
-] as const;
-
-type FactorType = ScenarioAdjustment['factorType'];
-type Level = ScenarioAdjustment['adjustmentLevel'];
+const NO_CHANGE_STEP = ADJUSTMENT_STEPS.indexOf(AdjustmentLevel.NoChange);
 
 function initialLevels(): Record<FactorType, Level> {
   return {
@@ -52,6 +60,14 @@ function initialLevels(): Record<FactorType, Level> {
     [AdjustableRiskFactorType.LaggedRainfall]: AdjustmentLevel.NoChange,
     [AdjustableRiskFactorType.HighAedesArea]: AdjustmentLevel.NoChange,
   };
+}
+
+/** "+15%", "−8%" or "No change"; values that cannot change relatively fall back to the raw difference. */
+function changeLabel(current: number, adjusted: number, format: (value: number) => string): string {
+  if (adjusted === current) return 'No change';
+  if (current === 0) return `${adjusted > current ? '+' : '−'}${format(Math.abs(adjusted - current))}`;
+  const percent = Math.round(((adjusted - current) / current) * 100);
+  return `${percent > 0 ? '+' : '−'}${Math.abs(percent)}%`;
 }
 
 export function SimulationBoundary({
@@ -62,90 +78,80 @@ export function SimulationBoundary({
   const [adjustments, setAdjustments] = useState(initialLevels);
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [error, setError] = useState('');
-  const [calculating, setCalculating] = useState(false);
 
-  // Clear the previous scenario when the baseline changes.
+  // Start from the baseline again when the assessment changes.
   useEffect(() => {
     setAdjustments(initialLevels());
-    setResult(null);
-    setError('');
-    setCalculating(false);
   }, [baseline, snapshot, simulationControl]);
 
-  function adjustFactor(factorType: FactorType, level: Level) {
-    setAdjustments((current) => ({
-      ...current,
-      [factorType]: level,
-    }));
-    setResult(null);
+  // Recalculate whenever a slider moves; ignore answers that arrive after a newer move.
+  useEffect(() => {
+    const selected: ScenarioAdjustment[] = factors
+      .filter((factor) => adjustments[factor.type] !== AdjustmentLevel.NoChange)
+      .map((factor) => ({ factorType: factor.type, adjustmentLevel: adjustments[factor.type] }));
+
     setError('');
-  }
-
-  async function calculateScenario() {
-    const selectedAdjustments: ScenarioAdjustment[] = factors
-      .filter(
-        (factor) =>
-          adjustments[factor.type] !== AdjustmentLevel.NoChange,
-      )
-      .map((factor) => ({
-        factorType: factor.type,
-        adjustmentLevel: adjustments[factor.type],
-      }));
-
-    if (selectedAdjustments.length === 0) {
+    if (selected.length === 0) {
       setResult(null);
-      setError('Choose at least one change before calculating.');
       return;
     }
 
-    setCalculating(true);
-    setError('');
+    let current = true;
+    simulationControl
+      .recalculateScenario(baseline, selected, snapshot)
+      .then((simulated) => {
+        if (current) setResult(simulated);
+      })
+      .catch(() => {
+        if (current) {
+          setResult(null);
+          setError('Simulation could not be calculated. Please try again.');
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [adjustments, baseline, snapshot, simulationControl]);
 
-    try {
-      const simulated = await simulationControl.recalculateScenario(
-        baseline,
-        selectedAdjustments,
-        snapshot,
-      );
-      setResult(simulated);
-    } catch {
-      setResult(null);
-      setError('Simulation could not be calculated. Please try again.');
-    } finally {
-      setCalculating(false);
-    }
+  function adjustFactor(factorType: FactorType, step: number) {
+    setAdjustments((levels) => ({ ...levels, [factorType]: ADJUSTMENT_STEPS[step] }));
   }
 
   function resetScenario() {
     setAdjustments(initialLevels());
-    setResult(null);
-    setError('');
+  }
+
+  function valueOf(factorType: FactorType, level: Level): number {
+    return simulationControl.adjustedValue(snapshot, baseline.subzoneId, factorType, level);
   }
 
   function showComparison() {
+    const baselineStyle = getRiskLevelStyle(baseline.riskLevel);
+
     if (!result) {
       return (
-        <p className="muted">
-          Adjust a factor and calculate to compare risk levels.
-        </p>
+        <div aria-label="Simulation comparison">
+          <h3>Current risk</h3>
+          <p>
+            {baseline.riskIndex.toFixed(1)} ({baselineStyle.label})
+          </p>
+          <p className="muted small">Move a slider to see how the risk would change.</p>
+        </div>
       );
     }
 
-    const difference =
-      result.simulated.riskIndex - result.baseline.riskIndex;
+    const difference = result.simulated.riskIndex - result.baseline.riskIndex;
 
     return (
-      <div aria-label="Simulation comparison">
+      <div aria-label="Simulation comparison" aria-live="polite">
         <h3>Baseline vs simulated risk</h3>
         <p>
           <strong>Baseline:</strong>{' '}
-          {result.baseline.riskIndex.toFixed(1)} (
-          {getRiskLevelStyle(result.baseline.riskLevel).label})
+          {result.baseline.riskIndex.toFixed(1)} ({getRiskLevelStyle(result.baseline.riskLevel).label})
         </p>
         <p>
           <strong>Simulated:</strong>{' '}
-          {result.simulated.riskIndex.toFixed(1)} (
-          {getRiskLevelStyle(result.simulated.riskLevel).label})
+          {result.simulated.riskIndex.toFixed(1)} ({getRiskLevelStyle(result.simulated.riskLevel).label})
         </p>
         <p>
           <strong>Risk index change:</strong>{' '}
@@ -153,8 +159,7 @@ export function SimulationBoundary({
           {difference.toFixed(1)}
         </p>
         <p className="muted small">
-          Hypothetical scenario only. This is not an official
-          dengue forecast.
+          Hypothetical scenario only. This is not an official dengue forecast.
         </p>
       </div>
     );
@@ -164,74 +169,59 @@ export function SimulationBoundary({
     <section>
       <h2>Simulate risk</h2>
       <p className="muted">
-        Explore how hypothetical changes to environmental factors
-        may affect the selected area's dengue risk.
+        Explore how hypothetical changes to environmental factors may affect the selected area's dengue risk.
       </p>
 
-      <div className="card">
+      <div className="card sim-card">
         <h3>Adjust risk factors</h3>
 
-        {factors.map((factor) => (
-          <fieldset
-            key={factor.type}
-            style={{ marginBottom: '16px' }}
-            disabled={calculating}
-          >
-            <legend>
-              <strong>{factor.label}</strong>
-            </legend>
+        {factors.map((factor) => {
+          const current = valueOf(factor.type, AdjustmentLevel.NoChange);
+          const level = adjustments[factor.type];
+          const adjusted = valueOf(factor.type, level);
+          const labels = ADJUSTMENT_STEPS.map((step) =>
+            changeLabel(current, valueOf(factor.type, step), factor.format));
+          const step = ADJUSTMENT_STEPS.indexOf(level);
+          // A value of 0 stays 0 under any % change (e.g. no Aedes overlap), so the slider would do nothing.
+          const fixed = labels.every((label) => label === 'No change');
+          const id = `sim-${factor.type}`;
 
-            <p className="muted small">{factor.description}</p>
-
-            {levels.map((level) => (
-              <label
-                key={level.value}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginRight: '16px',
-                }}
-              >
-                <input
-                  type="radio"
-                  name={factor.type}
-                  value={level.value}
-                  checked={adjustments[factor.type] === level.value}
-                  onChange={() =>
-                    adjustFactor(factor.type, level.value)
-                  }
-                />
-                {level.label}
+          return (
+            <div className="sim-factor" key={factor.type}>
+              <label htmlFor={id}>
+                <strong>{factor.label}:</strong> {factor.format(adjusted)}
+                {step !== NO_CHANGE_STEP && <span className="muted"> ({labels[step]})</span>}
               </label>
-            ))}
-          </fieldset>
-        ))}
+              <input
+                id={id}
+                type="range"
+                min={0}
+                max={ADJUSTMENT_STEPS.length - 1}
+                step={1}
+                value={step}
+                disabled={fixed}
+                aria-valuetext={`${labels[step]}, ${factor.format(adjusted)}`}
+                onChange={(event) => adjustFactor(factor.type, Number(event.target.value))}
+              />
+              {fixed ? (
+                <p className="muted small">This is 0 for this area, so it can't be adjusted here.</p>
+              ) : (
+                <div className="sim-ticks" aria-hidden="true">
+                  {labels.map((label, index) => <span key={ADJUSTMENT_STEPS[index]}>{label}</span>)}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-        <button
-          type="button"
-          className="primary"
-          disabled={calculating}
-          onClick={() => void calculateScenario()}
-        >
-          {calculating ? 'Calculating...' : 'Calculate scenario'}
-        </button>
-
-        {' '}
-
-        <button
-          type="button"
-          className="secondary"
-          disabled={calculating}
-          onClick={resetScenario}
-        >
+        <button type="button" className="secondary" onClick={resetScenario}>
           Reset to baseline
         </button>
 
         {error && <p role="alert" className="error-text">{error}</p>}
       </div>
 
-      <div className="card">
+      <div className="card sim-card">
         {showComparison()}
       </div>
     </section>

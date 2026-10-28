@@ -76,9 +76,11 @@ export const AdjustableRiskFactorType = {
 export type AdjustableRiskFactorType = (typeof AdjustableRiskFactorType)[keyof typeof AdjustableRiskFactorType];
 
 export const AdjustmentLevel = {
+  LargeDecrease: 'LARGE_DECREASE',
   Decrease: 'DECREASE',
   NoChange: 'NO_CHANGE',
   Increase: 'INCREASE',
+  LargeIncrease: 'LARGE_INCREASE',
 } as const;
 export type AdjustmentLevel = (typeof AdjustmentLevel)[keyof typeof AdjustmentLevel];
 

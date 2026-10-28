@@ -97,6 +97,51 @@ describe('RiskSimulationControl', () => {
     ).toBe(true);
   });
 
+  it('accepts the large adjustment levels at both ends of the scale', async () => {
+    const { control } = makeControl();
+
+    for (const adjustmentLevel of [AdjustmentLevel.LargeDecrease, AdjustmentLevel.LargeIncrease]) {
+      expect(
+        await control.validateAdjustment({
+          factorType: AdjustableRiskFactorType.Humidity,
+          adjustmentLevel,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it('moves two steps for the large levels', async () => {
+    const { control, generateAssessment } = makeControl();
+    const snapshot = makeSnapshot();
+
+    await control.recalculateScenario(
+      baseline,
+      [
+        { factorType: AdjustableRiskFactorType.Humidity, adjustmentLevel: AdjustmentLevel.LargeIncrease },
+        { factorType: AdjustableRiskFactorType.LaggedRainfall, adjustmentLevel: AdjustmentLevel.LargeDecrease },
+        { factorType: AdjustableRiskFactorType.HighAedesArea, adjustmentLevel: AdjustmentLevel.LargeIncrease },
+      ],
+      snapshot,
+    );
+
+    const simulatedSnapshot = generateAssessment.mock.calls[0][1];
+
+    // Humidity: 70 + 2 x 5 SD = 80. Rainfall: 100 - 2 x 20 SD = 60. Aedes: 0.5 x 1.4 = 0.7.
+    expect(simulatedSnapshot.weather.meanHumidityPct).toBe(80);
+    expect(simulatedSnapshot.weather.rainfallMm).toBe(60);
+    expect(simulatedSnapshot.subzones[0].aedesOverlapRatio).toBeCloseTo(0.7);
+  });
+
+  it('adjustedValue gives the current value for NO_CHANGE and never goes below 0 mm of rain', () => {
+    const { control } = makeControl();
+    const snapshot = makeSnapshot();
+    snapshot.weather.rainfallMm = 30;
+
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.Humidity, AdjustmentLevel.NoChange)).toBe(70);
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.LaggedRainfall, AdjustmentLevel.LargeDecrease)).toBe(0);
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.HighAedesArea, AdjustmentLevel.LargeDecrease)).toBeCloseTo(0.3);
+  });
+
   it('rejects non-adjustable factors and invalid levels', async () => {
     const { control } = makeControl();
 
