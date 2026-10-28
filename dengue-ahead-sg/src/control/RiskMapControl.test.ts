@@ -30,8 +30,7 @@ describe('RiskMapControl', () => {
     const assessAll = vi.fn().mockResolvedValue([item]);
     const control = new RiskMapControl({ retrievePublicData }, { assessAll });
     const result = await control.loadRiskMap();
-    if (result.status !== 'OK') 
-      throw new Error('Expected loaded map data.');
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
     const selection = control.getSelectedAssessment(item.subzoneId, result.data);
     expect(selection?.assessment).toBe(item);
     expect(selection?.subzone).toBe(snapshot.subzones[0]);
@@ -45,8 +44,7 @@ describe('RiskMapControl', () => {
     const item = assessment(snapshot.subzones[0].subzoneId, RiskLevel.Low);
     const control = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => [item] });
     const result = await control.loadRiskMap();
-    if (result.status !== 'OK') 
-      throw new Error('Expected loaded map data.');
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
     expect(control.getSelectedAssessment('unknown', result.data)).toBeNull();
     expect(control.getSelectedAssessment(snapshot.subzones[1].subzoneId, result.data)).toBeNull();
     expect(control.getSelectedAssessment(item.subzoneId, { ...result.data, snapshot: undefined })).toBeNull();
@@ -67,8 +65,7 @@ describe('RiskMapControl', () => {
     expect(dataService.retrievePublicData).toHaveBeenCalledOnce();
     expect(assessAll).toHaveBeenCalledExactlyOnceWith(snapshot);
     expect(result.status).toBe('OK');
-    if (result.status !== 'OK') 
-      throw new Error('Expected loaded map data.');
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
     expect(result.data.subzones).toEqual(snapshot.subzones);
     expect(result.data.riskLevels).toEqual({
       [low.subzoneId]: RiskLevel.Low,
@@ -97,16 +94,14 @@ describe('RiskMapControl', () => {
     };
     const result = await new RiskMapControl(new MockPublicDataService(snapshot), assessmentControl).loadRiskMap();
     expect(result.status).toBe('OK');
-    if (result.status === 'OK') 
-      expect(result.data.riskLevels[zone.subzoneId]).toBe(RiskLevel.High);
+    if (result.status === 'OK') expect(result.data.riskLevels[zone.subzoneId]).toBe(RiskLevel.High);
   });
 
   it('does not display an unrecognised risk level as an available assessment', async () => {
     const assessAll = async () => [assessment('TAMPINES EAST', 'UNKNOWN' as RiskLevel)];
     const result = await new RiskMapControl(new MockPublicDataService(), { assessAll }).loadRiskMap();
     expect(result.status).toBe('OK');
-    if (result.status === 'OK') 
-      expect(result.data.riskLevels).toEqual({});
+    if (result.status === 'OK') expect(result.data.riskLevels).toEqual({});
   });
 
   it('returns a safe message when data retrieval fails', async () => {
@@ -175,8 +170,7 @@ describe('Map popup and ranking (ticket #22)', () => {
     const originalIds = assessments.map((item) => item.subzoneId);
     const control = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => assessments });
     const result = await control.loadRiskMap();
-    if (result.status !== 'OK') 
-      throw new Error('Expected loaded map data.');
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
     const ranked = control.getTopSubzones(result.data);
     expect(ranked.map((item) => item.subzone.subzoneId)).toEqual([
       'area-10', 'area-11', 'area-09', 'area-08', 'area-07',
@@ -194,8 +188,7 @@ describe('Map popup and ranking (ticket #22)', () => {
     assessments.push(assessment('unknown-area', RiskLevel.High), assessments[4]);
     const control = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => assessments });
     const result = await control.loadRiskMap();
-    if (result.status !== 'OK') 
-      throw new Error('Expected loaded map data.');
+    if (result.status !== 'OK') throw new Error('Expected loaded map data.');
     expect(Object.keys(result.data.riskLevels)).toHaveLength(2);
     expect(control.getTopSubzones(result.data).map((item) => item.assessment.riskIndex)).toEqual([100, 0]);
     expect(control.getTopSubzones({ ...result.data, assessments: {} })).toEqual([]);

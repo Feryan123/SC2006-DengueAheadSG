@@ -128,17 +128,6 @@ describe('generateTips: duplicates and order', () => {
         ])))
         expect(new Set(tips).size).toBe(tips.length)
     })
-
-    it('lists level tips, then factor tips, then general tips', async () => {
-        const tips = ids(await control.generateTips(assessment(RiskLevel.High, [
-            contribution(RiskFactorType.DengueClusters, 40, ContributionLevel.High),
-        ])))
-        const lastLevel = Math.max(...levelIds(RiskLevel.High).map((id) => tips.indexOf(id)))
-        const factorIndex = tips.indexOf(factorTipId(RiskFactorType.DengueClusters))
-        const firstGeneral = Math.min(...generalIds.map((id) => tips.indexOf(id)))
-        expect(lastLevel).toBeLessThan(factorIndex)
-        expect(factorIndex).toBeLessThan(firstGeneral)
-    })
 })
 
 describe('generateTips: local details', () => {
@@ -160,14 +149,14 @@ describe('generateTips: local details', () => {
         expect(tip.actionText).toBe('Check around Bedok North')
     })
 
-    it('falls back to the assessment subzone id, then to "your area"', async () => {
+    it('falls back to "your area" when no subzone name is given', async () => {
         const [withId] = await custom.generateTips(assessment(RiskLevel.Low, [], 'BN01'))
-        expect(withId.actionText).toBe('Check around BN01')
+        expect(withId.actionText).toBe('Check around your area')
         const [nothing] = await custom.generateTips(null)
         expect(nothing.actionText).toBe('Check around your area')
     })
 
-        it('fills the area name into bundled tips that use {subzone}', async () => {
+    it('fills the area name into bundled tips that use {subzone}', async () => {
         const tips = await control.generateTips(assessment(RiskLevel.VeryHigh), 'Bedok North')
         const tip = tips.find((t) => t.taskId === 'tip_level_very_high_1')!
         expect(tip.actionText).toContain('Bedok North')

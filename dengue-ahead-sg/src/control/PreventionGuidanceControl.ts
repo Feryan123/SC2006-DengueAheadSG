@@ -5,10 +5,11 @@
  * IMPLEMENTED:
  * - loadChecklist() — returns the bundled NEA PreventionChecklist and its tasks
  * - showTaskDetails(taskId) — returns the selected task explanation and NEA source metadata
+ * - generateTips(assessment, subzone?) — personalised tips by risk level and top 2 contributors; falls back to "your area" when no name is given
  *
  * Relationships (dependencies):
  * - Called by PreventionGuidanceBoundary
- * - Reads PreventionChecklist, PreventionTask
+ * - Reads PreventionChecklist, PreventionTask, RiskAssessment, PlanningSubzone
  */
 
 import type { PlanningSubzone } from '../entity/PlanningSubzone.ts';
@@ -248,7 +249,6 @@ export class PreventionGuidanceControl {
    * Matching risk-level tips come first, then tips for the two strongest contributors,
    * then the general tips that apply at any level.
    */
-
   public async generateTips(
     assessment: RiskAssessment | null | undefined,
     subzone?: Pick<PlanningSubzone, "subzoneId" | "name"> | string | null,
@@ -259,8 +259,7 @@ export class PreventionGuidanceControl {
         : subzone != null
           ? subzone.name?.trim()
           : ""
-    const resolvedSubzoneName =
-      subzoneNameFromArgument || assessment?.subzoneId?.trim() || "your area"
+    const resolvedSubzoneName = subzoneNameFromArgument || "your area"
 
     const generalTips = this.checkList.tasks
       .filter((task) => task.riskLevels.length === 0 && !task.triggerFactor)
