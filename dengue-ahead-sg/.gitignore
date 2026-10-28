@@ -35,3 +35,6 @@ dist-ssr
 # by the Action to the data branch; do not ignore those or the Action's git add fails)
 data/dynamic/
 data/static/
+
+# Local copy of the real snapshot for running the app (Ticket 27); hosting is Ticket 47
+public/latest-snapshot.json
