@@ -11,6 +11,7 @@ import type {
 } from '../control/RiskSimulationControl.ts';
 import type { ScenarioAdjustment } from '../entity/ScenarioAdjustment.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
+import { getRiskLevelStyle } from './riskLevelStyle.ts';
 
 export interface SimulationBoundaryProps {
   baseline: RiskAssessment;
@@ -139,12 +140,12 @@ export function SimulationBoundary({
         <p>
           <strong>Baseline:</strong>{' '}
           {result.baseline.riskIndex.toFixed(1)} (
-          {result.baseline.riskLevel})
+          {getRiskLevelStyle(result.baseline.riskLevel).label})
         </p>
         <p>
           <strong>Simulated:</strong>{' '}
           {result.simulated.riskIndex.toFixed(1)} (
-          {result.simulated.riskLevel})
+          {getRiskLevelStyle(result.simulated.riskLevel).label})
         </p>
         <p>
           <strong>Risk index change:</strong>{' '}
