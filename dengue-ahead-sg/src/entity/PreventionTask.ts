@@ -1,6 +1,6 @@
 /**
  * Traces to: PreventionTask (<<entity>>) in class diagram
- * Related use case(s): UC-5 View Prevention Guidance (View Task Details & Source Info)
+ * Related use case(s): UC-3 View Prevention Guidance (View Task Details & Source Info)
  *
 * ATTRIBUTES:
  * - taskId : String — unique identifier of the task

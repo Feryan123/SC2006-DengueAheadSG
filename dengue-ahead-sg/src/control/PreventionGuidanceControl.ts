@@ -1,6 +1,6 @@
 /**
  * Traces to: PreventionGuidanceControl (<<control>>) in class diagram
- * Related use case(s): UC-5 View Prevention Guidance
+ * Related use case(s): UC-3 View Prevention Guidance
  *
  * IMPLEMENTED:
  * - loadChecklist() — returns the bundled NEA PreventionChecklist and its tasks
@@ -29,9 +29,10 @@ export interface TaskDetails {
 }
 
 const NEA_PREVENT_URL = 'https://www.nea.gov.sg/dengue-zika/prevent-aedes-mosquito-breeding';
+const NEA_OTHER_URL = 'https://www.nea.gov.sg/dengue-zika/prevent-aedes-mosquito-breeding/other-preventive-measures'
 const NEA_SAW_URL = 'https://www.nea.gov.sg/dengue-zika/stop-dengue-now';
-const NEA_CLUSTERS_URL = 'https://www.nea.gov.sg/dengue-zika/dengue/dengue-clusters';
 const NEA_GRAVITRAP_URL = 'https://www.nea.gov.sg/dengue-zika/Aedes';
+const NEA_REPELLENT_URL = 'https://www.nea.gov.sg/dengue-zika/stop-dengue-now/use-of-mosquito-repellents'
 
 const CONTRIBUTION_RANK: Record <ContributionLevel, number> = {
   [ContributionLevel.Low]: 1,
@@ -47,7 +48,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
     explanation:
       'Break up hardened soil to eliminate hidden pockets of stagnant water. Remove water from flowerpot plates every alternate day and scrub the plates thoroughly to remove Aedes mosquito eggs.',
     riskLevels: [],
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
   {
     taskId: 'tip_gen_block_2',
@@ -55,7 +56,7 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
     explanation:
       'Ensure that containers are dry. Change water in vases every alternate day and wash plant roots under running water. Clear fallen leaves from roof gutters and drains, and place Bti insecticide in roof gutters monthly.',
     riskLevels: [],
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
 
   // RISK-LEVEL TIER TIPS (At least 2 per RiskLevel: LOW, MODERATE, HIGH, VERY_HIGH)
@@ -66,49 +67,49 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
     explanation:
       'Even when local risk is Low, Aedes mosquitoes can breed in clean, stagnant water as small as a 20-cent coin. Conduct a routine weekly check of your home to prevent new breeding habitats.',
     riskLevels: [RiskLevel.Low],
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_SAW_URL,
   },
   {
     taskId: 'tip_level_low_2',
-    actionText: 'Seal seldom-used gully traps and cover toilet bowls when away',
+    actionText: 'Cover rarely used gully traps',
     explanation:
-      'Keep gully traps covered or install anti-mosquito valves, and close toilet bowl lids if you are away from home for an extended period so mosquitoes cannot lay eggs indoors.',
+      'NEA\'s checklist says to cover rarely used gully traps or replace them with non-perforated ones fitted with an anti-mosquito valve. Gully traps are among the top breeding habitats NEA finds in public areas.',
     riskLevels: [RiskLevel.Low],
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
 
   // MODERATE RISK (2 tips)
   {
     taskId: 'tip_level_moderate_1',
-    actionText: 'Conduct Mozzie Wipeout checks every alternate day',
+    actionText: 'Remove water from plant pot plates and change vase water every other day and do the full Mozzie Wipeout every week',
     explanation:
-      'Because Aedes mosquitoes can complete their breeding cycle in about 7 days, checking and emptying water-bearing containers every alternate day stops larvae from maturing into adult mosquitoes.',
+      'NEA\'s checklist puts plant pot plates and flower vases on an every-other-day schedule and clearing scupper drains and gardens on a weekly one. NEA\'s life-cycle figures show an egg can become an adult in about a week so regular checks stop mosquitoes from maturing.',
     riskLevels: [RiskLevel.Moderate],
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
   {
     taskId: 'tip_level_moderate_2',
-    actionText: 'Clear hardened soil on potted plants and dry wet floor traps',
+    actionText: 'Loosen soil in potted plants, and turn pails and watering cans over',
     explanation:
-      'Loosen hardened soil in potted plants so water does not puddle on the surface, and scrub bathroom floor traps to remove any mosquito eggs attached to the inner walls.',
+      'NEA\'s checklist says to loosen soil so water does not collect on hardened soil and to turn pails and watering cans over and store them under shelter. Pails are the most common breeding habitat NEA finds in homes.',
     riskLevels: [RiskLevel.Moderate],
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
 
   // HIGH RISK (2 tips)
   {
     taskId: 'tip_level_high_1',
-    actionText: 'Take extra precautions: Apply DEET, picaridin, or IR3535 insect repellent (S-A-W)',
+    actionText: 'Take extra precautions: Apply an NEA-registered insect repellent (DEET, picaridin, or IR3535 insect repellent) to exposed skin and reapply as the label says (S-A-W)',
     explanation:
-      'When in or visiting a High risk area, take extra precautions against mosquito bites by applying NEA-recommended insect repellent (containing DEET, picaridin, or IR3535) regularly to exposed skin.',
+      'NEA says repellents with DEET, picaridin or IR3535 are the most effective, and to reapply according to the product label. Look for the NEA registration mark when buying.',
     riskLevels: [RiskLevel.High],
-    sourceUrl: NEA_SAW_URL,
+    sourceUrl: NEA_REPELLENT_URL,
   },
   {
     taskId: 'tip_level_high_2',
-    actionText: 'Take extra precautions: Spray insecticide in dark corners of your home (S-A-W)',
+    actionText: 'Take extra precautions: spray insecticide in dark corners around your home, such as under the bed or sofa and behind curtains (S-A-W)',
     explanation:
-      'Adult Aedes mosquitoes prefer resting in cool, dark, and shaded indoor spaces. Spray aerosol insecticide under beds, behind curtains, and under sofas to eliminate adult mosquitoes.',
+      'Spraying dark corners is the first of NEA\'s three protective actions against dengue (Spray, Apply, Wear). Follow the product label; NEA has a video on using aerosol insecticide safely.',
     riskLevels: [RiskLevel.High],
     sourceUrl: NEA_SAW_URL,
   },
@@ -116,17 +117,17 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // VERY HIGH RISK (2 tips)
   {
     taskId: 'tip_level_very_high_1',
-    actionText: 'Take extra precautions daily: Wear long-sleeved tops and long pants (S-A-W)',
+    actionText: 'Take extra precautions daily: Wear long-sleeved tops and long pants and keep applying repellent (S-A-W)',
     explanation:
-      'In Very High risk areas, take extra personal precautions by wearing long-sleeved shirts and long trousers alongside regular repellent application, especially during peak biting hours after dawn and before dusk.',
+      'Wearing long sleeves and long pants is the third of NEA\'s S-A-W actions. NEA encourages all residents, especially those living in dengue cluster areas, to do all three.',
     riskLevels: [RiskLevel.VeryHigh],
     sourceUrl: NEA_SAW_URL,
   },
   {
     taskId: 'tip_level_very_high_2',
-    actionText: 'Take extra precautions: Perform daily stagnant-water checks and indoor spraying',
+    actionText: 'Take extra precautions: do the B-L-O-C-K steps at least once a week, take all three S-A-W actions, and fit mosquito screens on windows and doors where you can',
     explanation:
-      'Combine daily B-L-O-C-K stagnant-water removal with S-A-W protective actions (Spray insecticide in dark corners, Apply repellent regularly, Wear covered clothing) and install mosquito screens where possible.',
+      'NEA advises doing the Mozzie Wipeout at least once a week, and lists mosquito screens on windows and doors among its other protective measures against bites.',
     riskLevels: [RiskLevel.VeryHigh],
     sourceUrl: NEA_SAW_URL,
   },
@@ -135,21 +136,21 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // 1. Dengue Clusters
   {
     taskId: 'tip_factor_clusters',
-    actionText: 'Active cluster precaution: Apply repellent and cooperate with NEA inspections',
+    actionText: 'Take the three protective actions against dengue: Spray insecticide in dark corners, Apply repellent regularly, Wear long sleeves and long pants',
     explanation:
-      'Active dengue clusters indicate ongoing transmission nearby. Take extra precautions with S-A-W (Spray insecticide, Apply repellent, Wear long sleeves/pants) and allow NEA officers to inspect premises and carry out misting.',
+      'An active dengue cluster means transmission nearby. NEA encourages all residents, especially those in cluster areas, to do all three, and to cooperate with NEA officers during inspection rounds.',
     riskLevels: [],
     triggerFactor: RiskFactorType.DengueClusters,
     minContributionLevel: ContributionLevel.Moderate,
-    sourceUrl: NEA_CLUSTERS_URL,
+    sourceUrl: NEA_SAW_URL,
   },
 
   // 2. High-Aedes Area
   {
     taskId: 'tip_factor_aedes',
-    actionText: 'High Gravitrap Aedes population: Eliminate indoor resting & breeding spots',
+    actionText: 'Do the Mozzie Wipeout regularly, and remind family, friends and neighbours to remove stagnant water around their homes',
     explanation:
-      'NEA Gravitrap surveillance detects a higher female Aedes aegypti mosquito population in this area. Spray aerosol insecticide in dark indoor corners (behind curtains and under furniture) and scrub dish-drying trays and plant plates.',
+      'NEA\'s Gravitrap surveillance detects areas with a higher Aedes aegypti population, and NEA urges residents there to practise the Mozzie Wipeout regularly. NEA also reminds that low risk does not mean no risk.',
     riskLevels: [],
     triggerFactor: RiskFactorType.HighAedesArea,
     minContributionLevel: ContributionLevel.Moderate,
@@ -159,37 +160,37 @@ export const BUNDLED_PREVENTION_TASKS: PreventionTask[] = [
   // 3. Population Density
   {
     taskId: 'tip_factor_density',
-    actionText: 'High-density living: Check shared corridors, dish racks, and balcony drains',
+    actionText: 'Keep shared-corridor scupper drains clear, and cover bamboo pole holders after use',
     explanation:
-      'In densely populated residential areas, mosquitoes can easily fly between neighbouring units. Keep corridor plant pots, bamboo pole holders, and kitchen dish-drying trays completely dry.',
+      'NEA\'s checklist says not to block the flow of water in scupper drains along common corridors in HDB estates or put pots over them, and to cover bamboo pole holders because rainwater can collect in them. HDB corridor scupper and gully drains were among the top breeding habitats NEA found in public areas in 2025.',
     riskLevels: [],
     triggerFactor: RiskFactorType.PopulationDensity,
     minContributionLevel: ContributionLevel.Moderate,
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
 
   // 4. Humidity
   {
     taskId: 'tip_factor_humidity',
-    actionText: 'Humid conditions: Inspect indoor trays and containers',
+    actionText: 'Remove water from plant pot plates and change vase water every other day',
     explanation:
-      'Elevated humidity prolongs adult Aedes mosquito survival and activity. Check kitchen trays and bathroom receptacles every alternate day to prevent indoor breeding.',
+      'NEA\'s checklist puts these two on an every-other-day schedule: scrub the plate or vase thoroughly and wash plant roots, because mosquito eggs stick to them easily.',
     riskLevels: [],
     triggerFactor: RiskFactorType.Humidity,
     minContributionLevel: ContributionLevel.Moderate,
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
 
   // 5. Lagged Rainfall
   {
     taskId: 'tip_factor_rainfall',
-    actionText: 'Post-rainfall check: Clear outdoor containers, canvas sheets, and drains',
+    actionText: 'Clear fallen leaves and stagnant water from scupper drains and your garden once a week, and turn pails over',
     explanation:
-      'Recent rainfall creates stagnant puddles in outdoor receptacles, canvas sheets, and clogged drains. Overturn outdoor pails, pull taut any canvas coverings, and clear fallen leaves after rain.',
+      'NEA\'s weekly checklist includes clearing leaves and water from scupper drains and gardens, because leaves can block drains and cause stagnant water to build up.',
     riskLevels: [],
     triggerFactor: RiskFactorType.LaggedRainfall,
     minContributionLevel: ContributionLevel.Moderate,
-    sourceUrl: NEA_PREVENT_URL,
+    sourceUrl: NEA_OTHER_URL,
   },
 ];
 

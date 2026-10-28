@@ -1,6 +1,6 @@
 /**
  * Traces to: PreventionGuidanceBoundary (<<boundary>>) in class diagram
- * Related use case(s): UC-5 View Prevention Guidance
+ * Related use case(s): UC-3 View Prevention Guidance
  *
 * IMPLEMENTED:
  * - Loads and renders PreventionChecklist tasks via PreventionGuidanceControl.loadChecklist()

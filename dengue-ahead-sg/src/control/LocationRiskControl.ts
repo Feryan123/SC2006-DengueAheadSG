@@ -153,7 +153,7 @@ export class LocationRiskControl {
         const subzone = await this.identifyPlanningSubzone(geocoded.coordinates, snapshot.subzones)
         
         if (!subzone)
-            return this.handleUnavailableData(withStatus(ValidationStatus.OutsideSingapore))
+            return this.handleUnavailableData("Area data unavailable for this location.")
 
         //Baseline Assessment
         let assessment: RiskAssessment | null

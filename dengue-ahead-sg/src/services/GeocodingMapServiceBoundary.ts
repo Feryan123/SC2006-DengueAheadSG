@@ -1,7 +1,7 @@
 /**
  * Traces to: GeocodingMapServiceBoundary (<<boundary>>) in class diagram
  * (the "OneMapAdapter" in backlog #14)
- * Related use case(s): UC-1 Assess Location Risk, UC-5 Identify Planning Subzone,
+ * Related use case(s): UC-1 Assess Location Risk, UC-5 Identify Planning Subzone
  * UC-5 (Handle Unavailable Data / Invalid Location)
  *
  * IMPLEMENTS:

@@ -117,11 +117,11 @@ describe("LocationRiskControl.assessLocation", () => {
         expect(result.status).toBe("INVALID_LOCATION")
     })
 
-    it("point inside bounds but in no subzone returns INVALID_LOCATION", async () => {
+    it("point inside bounds but in no subzone returns DATA_UNAVAILABLE", async () => {
         const result = await makeControl({
             geocode: async () => ({ coordinates: [104.0, 1.2], matchedAddress: "sea" }),
         }).assessLocation("somewhere")
-        expect(result.status).toBe("INVALID_LOCATION")
+        expect(result).toEqual({ status: "DATA_UNAVAILABLE", reason: "Area data unavailable for this location." })
     })
 
     it("geocoder outage returns DATA_UNAVAILABLE, not INVALID_LOCATION", async () => {
