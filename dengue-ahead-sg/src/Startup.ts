@@ -44,9 +44,11 @@ export interface StartupResult {
 export async function initializeApplication(
   options: StartupOptions = {},
 ): Promise<StartupResult> {
-  // TODO (#8): Replace this URL once snapshot hosting is confirmed.
-  // The hourly sync currently writes to the data branch, not public/.
-  const snapshotUrl = options.snapshotUrl ?? '/latest-snapshot.json';
+  // Deployed: api/snapshot.ts serves the data-branch snapshot (#27).
+  // `npm run dev` cannot run that function, so it reads a local copy in public/ instead.
+  const snapshotUrl =
+    options.snapshotUrl ??
+    (import.meta.env.DEV ? '/latest-snapshot.json' : '/api/snapshot');
 
   const dataService: ApprovedPublicDataServiceBoundary =
     options.dataService ??
