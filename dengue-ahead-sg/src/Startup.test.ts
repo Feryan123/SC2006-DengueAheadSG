@@ -62,7 +62,6 @@ describe('Startup dependency wiring (Ticket #8)', () => {
 
     expect(result.dataService).toBe(dataService);
     expect(retrievePublicData).not.toHaveBeenCalled();
-    expect(result.appProps.publicSnapshot).toBeUndefined();
   });
 
   it('uses the injected service for map assessments', async () => {
@@ -95,7 +94,6 @@ describe('Startup dependency wiring (Ticket #8)', () => {
       dataService: failingService,
     });
 
-    expect(result.appProps.publicSnapshot).toBeUndefined();
     expect(retrievePublicData).not.toHaveBeenCalled();
     expect(result.appProps.mapControl).toBeInstanceOf(RiskMapControl);
     expect(result.appProps.simulationControl).toBeInstanceOf(

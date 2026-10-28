@@ -25,8 +25,6 @@ export type AppProps = {
   mapControl?: RiskMapControl;
   preventionControl?: PreventionGuidanceControl;
   simulationControl?: RiskSimulationControl;
-  // Start-up must supply the same snapshot used by location assessment.
-  publicSnapshot?: PublicDataSnapshot;
 };
 
 const defaultMapControl = new RiskMapControl();
@@ -96,8 +94,8 @@ export default function App(props: AppProps = {}) {
     setScreen('result');
   }
 
-  function showHomeAssessment(selectedSubzone: PlanningSubzone, selectedAssessment: RiskAssessment) {
-    showAssessment(selectedSubzone, selectedAssessment, props.publicSnapshot, 'home');
+  function showHomeAssessment(selectedSubzone: PlanningSubzone, selectedAssessment: RiskAssessment, snapshot?: PublicDataSnapshot) {
+    showAssessment(selectedSubzone, selectedAssessment, snapshot, 'home');
   }
 
   function showMapAssessment(id: string, selection?: MapAssessmentSelection) {
