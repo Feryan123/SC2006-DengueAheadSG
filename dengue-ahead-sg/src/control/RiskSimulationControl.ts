@@ -6,9 +6,11 @@
  * Simulation uses a copy of the public data snapshot and reuses
  * RiskAssessmentControl.generateAssessment() for risk calculation.
  *
- * Adjustment rule (one step = one AdjustmentLevel away from NO_CHANGE; up to 2 steps each way):
- * - Humidity and lagged rainfall: 1 normal standard deviation per step.
- * - High-Aedes overlap: provisional 20% per step (Ticket 42).
+ * Adjustment rule (one step = one AdjustmentLevel away from NO_CHANGE; up to 2 steps each way;
+ * step sizes in SIMULATION_STEP_SD, reasons in riskModelConfig.ts and the risk model spec, Ticket 42):
+ * - Humidity: 1 SD of the month's normal per step.
+ * - Lagged rainfall: 0.5 SD of the month's normal per step, never below 0 mm.
+ * - High-Aedes overlap: 1 SD of the overlap across all subzones per step, kept within 0-100%.
  */
 
 import {
@@ -20,6 +22,7 @@ import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import type { ScenarioAdjustment } from '../entity/ScenarioAdjustment.ts';
 import type { SimulationScenario } from '../entity/SimulationScenario.ts';
 import type { RiskAssessmentControl } from './RiskAssessmentControl.ts';
+import { SIMULATION_STEP_SD } from './riskModelConfig.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
 
 /** Adjustment levels in slider order; a level's step is its index minus 2 (-2..+2). */
@@ -202,7 +205,8 @@ export class RiskSimulationControl {
     switch (factorType) {
       case AdjustableRiskFactorType.Humidity:
         return this.clamp(
-          weather.meanHumidityPct + step * weather.humidityNormalSd,
+          weather.meanHumidityPct +
+            step * SIMULATION_STEP_SD.humidity * weather.humidityNormalSd,
           0,
           100,
         );
@@ -210,18 +214,34 @@ export class RiskSimulationControl {
       case AdjustableRiskFactorType.LaggedRainfall:
         return Math.max(
           0,
-          weather.rainfallMm + step * weather.rainfallNormalSd,
+          weather.rainfallMm +
+            step * SIMULATION_STEP_SD.rainfall * weather.rainfallNormalSd,
         );
 
       case AdjustableRiskFactorType.HighAedesArea: {
         const ratio =
           snapshot.subzones.find((subzone) => subzone.subzoneId === subzoneId)
             ?.aedesOverlapRatio ?? 0;
-        // TODO(Ticket 42): Replace the provisional 20%-per-step rule
-        // with the team-approved High-Aedes adjustment rule.
-        return this.clamp(ratio * (1 + 0.2 * step), 0, 1);
+        const spread = this.standardDeviation(
+          snapshot.subzones.map((subzone) => subzone.aedesOverlapRatio),
+        );
+        return this.clamp(
+          ratio + step * SIMULATION_STEP_SD.aedesOverlap * spread,
+          0,
+          1,
+        );
       }
     }
+  }
+
+  /** Sample standard deviation; 0 when there are fewer than 2 values (nothing to compare). */
+  private standardDeviation(values: number[]): number {
+    const valid = values.filter(Number.isFinite);
+    if (valid.length < 2) return 0;
+
+    const mean = valid.reduce((sum, value) => sum + value, 0) / valid.length;
+    const squares = valid.reduce((sum, value) => sum + (value - mean) ** 2, 0);
+    return Math.sqrt(squares / (valid.length - 1));
   }
 
   private clamp(

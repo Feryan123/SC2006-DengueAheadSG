@@ -41,6 +41,23 @@ function makeSnapshot(): PublicDataSnapshot {
         residentsPerKm2: 1000,
         aedesOverlapRatio: 0.5,
       },
+      // Overlaps 0.5 / 0.3 / 0.1 give an Aedes spread (sample SD) of exactly 0.2.
+      {
+        subzoneId: 'SZ-2',
+        name: 'SECOND SUBZONE',
+        boundary: { type: 'Polygon', coordinates: [] },
+        clusterCasesNearby: 0,
+        residentsPerKm2: 500,
+        aedesOverlapRatio: 0.3,
+      },
+      {
+        subzoneId: 'SZ-3',
+        name: 'THIRD SUBZONE',
+        boundary: { type: 'Polygon', coordinates: [] },
+        clusterCasesNearby: 0,
+        residentsPerKm2: 200,
+        aedesOverlapRatio: 0.1,
+      },
     ],
     populationProfiles: [],
     dengueClusters: [],
@@ -126,20 +143,40 @@ describe('RiskSimulationControl', () => {
 
     const simulatedSnapshot = generateAssessment.mock.calls[0][1];
 
-    // Humidity: 70 + 2 x 5 SD = 80. Rainfall: 100 - 2 x 20 SD = 60. Aedes: 0.5 x 1.4 = 0.7.
+    // Humidity: 70 + 2 x 1 SD (5) = 80. Rainfall: 100 - 2 x 0.5 SD (10) = 80. Aedes: 0.5 + 2 x 0.2 = 0.9.
     expect(simulatedSnapshot.weather.meanHumidityPct).toBe(80);
-    expect(simulatedSnapshot.weather.rainfallMm).toBe(60);
-    expect(simulatedSnapshot.subzones[0].aedesOverlapRatio).toBeCloseTo(0.7);
+    expect(simulatedSnapshot.weather.rainfallMm).toBe(80);
+    expect(simulatedSnapshot.subzones[0].aedesOverlapRatio).toBeCloseTo(0.9);
   });
 
   it('adjustedValue gives the current value for NO_CHANGE and never goes below 0 mm of rain', () => {
     const { control } = makeControl();
     const snapshot = makeSnapshot();
-    snapshot.weather.rainfallMm = 30;
+    snapshot.weather.rainfallMm = 5;
 
     expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.Humidity, AdjustmentLevel.NoChange)).toBe(70);
     expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.LaggedRainfall, AdjustmentLevel.LargeDecrease)).toBe(0);
-    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.HighAedesArea, AdjustmentLevel.LargeDecrease)).toBeCloseTo(0.3);
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.HighAedesArea, AdjustmentLevel.LargeDecrease)).toBeCloseTo(0.1);
+  });
+
+  it('moves a subzone with no Aedes overlap by the spread across subzones', () => {
+    const { control } = makeControl();
+    const snapshot = makeSnapshot();
+    // Overlaps 0 / 0 / 0.6: mean 0.2, sample SD sqrt(0.12).
+    snapshot.subzones[0].aedesOverlapRatio = 0;
+    snapshot.subzones[1].aedesOverlapRatio = 0;
+    snapshot.subzones[2].aedesOverlapRatio = 0.6;
+
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.HighAedesArea, AdjustmentLevel.Increase)).toBeCloseTo(Math.sqrt(0.12));
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.HighAedesArea, AdjustmentLevel.Decrease)).toBe(0);
+  });
+
+  it('leaves Aedes overlap unchanged when there is only one subzone to compare', () => {
+    const { control } = makeControl();
+    const snapshot = makeSnapshot();
+    snapshot.subzones = [snapshot.subzones[0]];
+
+    expect(control.adjustedValue(snapshot, 'SZ-1', AdjustableRiskFactorType.HighAedesArea, AdjustmentLevel.LargeIncrease)).toBe(0.5);
   });
 
   it('rejects non-adjustable factors and invalid levels', async () => {
@@ -194,14 +231,14 @@ describe('RiskSimulationControl', () => {
       assessmentType: AssessmentType.Simulated,
     });
 
-    // Humidity: 70 + 5 SD = 75.
+    // Humidity: 70 + 1 SD (5) = 75.
     expect(simulatedSnapshot.weather.meanHumidityPct).toBe(75);
 
-    // Rainfall: 100 - 20 SD = 80.
-    expect(simulatedSnapshot.weather.rainfallMm).toBe(80);
+    // Rainfall: 100 - 0.5 SD (10) = 90.
+    expect(simulatedSnapshot.weather.rainfallMm).toBe(90);
 
-    // High-Aedes remains provisional +/- 20% (Ticket 42).
-    expect(simulatedSnapshot.subzones[0].aedesOverlapRatio).toBeCloseTo(0.6);
+    // High-Aedes: 0.5 + 1 SD across subzones (0.2) = 0.7.
+    expect(simulatedSnapshot.subzones[0].aedesOverlapRatio).toBeCloseTo(0.7);
 
     expect(snapshot).toEqual(original);
     expect(result.baseline).toBe(baseline);

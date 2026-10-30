@@ -21,6 +21,20 @@ export const CONTRIBUTION_BANDS = { moderateFrom: 34, highFrom: 67 } as const;  
 
 export const Z_CAP = 2;
 
+/**
+ * Simulation slider: standard deviations moved per step (up to 2 steps each way, Ticket 62).
+ * Chosen so the slider's ends stay within values seen in the reference data:
+ * - Humidity: 1 SD of that month's 2014–2025 normal (±2 steps stays inside the observed range).
+ * - Rainfall: 0.5 SD of that month's 1991–2020 normal; ±2 full SDs fall below 0 mm in 4 of 12 months.
+ * - High-Aedes overlap: 1 SD of the overlap across all subzones (about 10 percentage points),
+ *   so subzones with no overlap (most of them) can move too.
+ */
+export const SIMULATION_STEP_SD = {
+  humidity: 1,
+  rainfall: 0.5,
+  aedesOverlap: 1,
+} as const;
+
 export function rankSumWeights(
   rank: Record<RiskFactorType, number>,
 ): Record<RiskFactorType, number> { 
