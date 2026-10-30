@@ -126,6 +126,39 @@ uses a public snapshot URL and sends no API key. Private data-source credentials
 belong in the pipeline's server environment.
 
 Run its checks with `npm test -- --run src/services/CachedPublicDataServiceProxy.test.ts`.
+
+### Snapshot hosting (ticket #27)
+
+The repository is private, so the browser cannot download the snapshot from
+the `data` branch directly. `api/snapshot.ts` is a server-only Vercel function
+that reads `dengue-ahead-sg/data/derived/latest-snapshot.json` from the `data`
+branch through the GitHub API and returns it as compact JSON (about 2.7 MB; the
+committed file is pretty-printed and larger than a function response may be).
+
+| Where | Snapshot URL |
+|---|---|
+| Deployed (`npm run build`) | `/api/snapshot` |
+| `npm run dev` | `/latest-snapshot.json`, a local copy in `public/` (gitignored) |
+
+Vite does not run Vercel functions, so for local work copy the latest snapshot
+into `public/` first (`npm run sync` writes `data/derived/latest-snapshot.json`):
+
+```bash
+cp data/derived/latest-snapshot.json public/latest-snapshot.json
+```
+
+**Secret:** set `SNAPSHOT_GITHUB_TOKEN` in the Vercel project's environment
+variables. Use a fine-grained personal access token limited to this repository
+with **Contents: Read-only** and nothing else. Never use a `VITE_*` name: those
+values are built into the public frontend.
+
+The CDN caches successful responses for 10 minutes (the sync runs hourly), and
+each server instance reuses its copy for 10 minutes. If GitHub is unavailable,
+the function serves its last good copy; with none, it returns `503` and the
+browser's cache Proxy falls back as described above. Errors never include the
+token or GitHub's reply.
+
+Run its checks with `npm test -- --run tests/snapshot.test.ts`.
 ## Risk map
 
 Open **Risk Map** from the menu. Select a subzone by clicking its outline,
