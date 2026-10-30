@@ -1,3 +1,4 @@
+
 // - Show subzone colours, selected-area details and the top 10 assessed areas.
 // - Use Leaflet for the map and RiskMapControl for its data (UC-2).
 // - Show a warning when the map uses saved backup data (Ticket #58).
@@ -223,10 +224,14 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
     clusterLayer.current = clusters;
     aedesLayer.current = aedes;
 
-    // Remove Leaflet's map and listeners when this screen closes
-    // or its data or control changes.
+    // Stop ongoing map animations before removing Leaflet's map and listeners.
+    // This also runs when the screen closes or its data or control changes.
     return () => {
       baseTiles.off(tileEvents);
+      leafletMap.stop();
+      // Leaflet 1.9.4 leaves a delayed zoom callback after map removal.
+      // Clear this flag so the callback exits before accessing the removed map.
+      (leafletMap as L.Map & { _animatingZoom?: boolean })._animatingZoom = false;
       leafletMap.remove();
       map.current = null;
       areaLayers.current = [];
