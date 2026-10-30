@@ -12,6 +12,8 @@ import type { DatasetStatus } from '../entity/enums.ts';
 /** Everything the app needs from the public data sources, fetched in one go. */
 export interface PublicDataSnapshot {
   generatedAt: string;
+  /** Ticket #58: set by the cache Proxy only when it returns the bundled backup. */
+  isBundledFallback?: boolean;
   datasets: Record<string, { retrievedAt: string; status: DatasetStatus }>
   subzones: PlanningSubzone[];
   populationProfiles: PopulationProfile[];

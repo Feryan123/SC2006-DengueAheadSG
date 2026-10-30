@@ -1,10 +1,9 @@
 
 /**
- * Ticket #8: System start-up and dependency wiring.
- *
- * Creates the shared services and controls used by the application.
- * The data service can be injected for testing without changing
- * the production dependency structure.
+ * - Create the services and controls shared by the app.
+ * - Supply saved backup data when the network and cache cannot provide data.
+ * - Allow tests to supply their own data service or backup snapshot.
+ * - Tickets #8 and #58: app startup and bundled backup data.
  */
 
 import { LocationRiskControl } from './control/LocationRiskControl.ts';
@@ -15,6 +14,7 @@ import { PreventionGuidanceControl } from './control/PreventionGuidanceControl.t
 
 import { SnapshotDataService } from './services/SnapshotDataService.ts';
 import { CachedPublicDataServiceProxy } from './services/CachedPublicDataServiceProxy.ts';
+import bundledSnapshot from './data/bundled-snapshot.json';
 
 import type {
   ApprovedPublicDataServiceBoundary,
@@ -52,7 +52,7 @@ export async function initializeApplication(
     options.dataService ??
     new CachedPublicDataServiceProxy(
       new SnapshotDataService(snapshotUrl),
-      options.bundledFallback,
+      options.bundledFallback ?? bundledSnapshot,
     );
 
   const riskAssessmentControl = new RiskAssessmentControl();
