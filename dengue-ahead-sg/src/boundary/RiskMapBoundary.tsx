@@ -1,6 +1,7 @@
 // - Show subzone colours, selected-area details and the top 10 assessed areas.
 // - Use Leaflet for the map and RiskMapControl for its data (UC-2).
 // - Show a warning when the map uses saved backup data (Ticket #58).
+// - Show the base-map warning only after its images fail to load (Ticket #57).
 
 import { useEffect, useRef, useState } from 'react';
 import * as L from 'leaflet';
@@ -79,11 +80,31 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
     setMapError('');
     setTilesUnavailable(false);
 
-    L.tileLayer('https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png', {
+    const baseTiles = L.tileLayer('https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png', {
       minZoom: 11,
       maxZoom: 19,
       attribution: '<img src="https://www.onemap.gov.sg/web-assets/images/logo/om_logo.png" style="height:20px;width:20px;" alt=""/> <a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a> &copy; contributors | <a href="https://www.sla.gov.sg/" target="_blank" rel="noopener noreferrer">Singapore Land Authority</a>',
-    }).on('tileerror', () => setTilesUnavailable(true)).addTo(leafletMap);
+    });
+
+    let tilesFailed = false;
+
+    function updateTileWarning() {
+      const tileContainer = baseTiles.getContainer();
+      if (!tileContainer) return;
+
+      // One broken image does not mean the whole background map is unavailable.
+      const hasLoadedTile = tileContainer.querySelector('.leaflet-tile-loaded') !== null;
+      setTilesUnavailable(tilesFailed && !baseTiles.isLoading() && !hasLoadedTile);
+    }
+
+    const tileEvents = {
+      loading: () => { tilesFailed = false; },
+      tileerror: () => { tilesFailed = true; updateTileWarning(); },
+      tileload: () => { setTilesUnavailable(false); },
+      load: updateTileWarning,
+      tileunload: updateTileWarning,
+    };
+    baseTiles.on(tileEvents).addTo(leafletMap);
 
     try {
       for (const zone of data?.subzones ?? []) {
@@ -205,6 +226,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
     // Remove Leaflet's map and listeners when this screen closes
     // or its data or control changes.
     return () => {
+      baseTiles.off(tileEvents);
       leafletMap.remove();
       map.current = null;
       areaLayers.current = [];
