@@ -1,6 +1,7 @@
 // - Keep the selected area and assessment while moving between screens.
 // - Connect the real boundary components and handle unavailable data.
 // - Show the backup warning on result and simulation screens (Ticket #58).
+// - Let keyboard users skip navigation and go straight to the page (Ticket #32).
 // - Ticket 19: App navigation for UC-1 to UC-5.
 
 import { useState } from 'react';
@@ -206,6 +207,7 @@ export default function App(props: AppProps = {}) {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <header className="site-header">
         <div className="header-inner">
           <button className="brand" aria-label="DengueAhead SG home" onClick={goHome}>
@@ -237,7 +239,7 @@ export default function App(props: AppProps = {}) {
           </nav>
         </div>
       </header>
-      <main className="site-main">
+      <main className="site-main" id="main-content" tabIndex={-1}>
         {screen === 'result' || screen === 'simulation'
           ? <BundledFallbackNotice snapshot={snapshot} />
           : null}
