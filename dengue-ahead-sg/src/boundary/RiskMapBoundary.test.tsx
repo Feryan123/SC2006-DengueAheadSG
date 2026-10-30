@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // - Draw the real Leaflet layers using test data, without network requests.
 // - Check colours, area selection, errors and safe area names.
+// - Check background-map failures and recovery (Ticket #57).
 // - Ticket #20: Explore Risk Map / Assess Location Risk.
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,6 +63,71 @@ function button(label: string) {
   if (!found) throw new Error(`Button not found: ${label}`);
   return found;
 }
+
+// Open the map and return its background images for simulated load/error events.
+async function openBackgroundMap() {
+  const { control } = await mapWithAssessments();
+  await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
+  const tiles = container.querySelectorAll<HTMLImageElement>('img.leaflet-tile');
+  expect(tiles.length).toBeGreaterThan(1);
+  return tiles;
+}
+
+const baseMapWarning = 'The base map is unavailable. Area boundaries can still be viewed.';
+
+describe('Background map warning (Ticket #57)', () => {
+  it('keeps the warning hidden while loading and after successful loading', async () => {
+    const tiles = await openBackgroundMap();
+    expect(container.textContent).not.toContain(baseMapWarning);
+
+    await act(async () => {
+      for (const tile of tiles) tile.dispatchEvent(new Event('load'));
+    });
+
+    expect(container.textContent).not.toContain(baseMapWarning);
+  });
+
+  it('does not report a map outage when one tile fails after other tiles load', async () => {
+    const tiles = await openBackgroundMap();
+    await act(async () => {
+      for (let index = 0; index < tiles.length - 1; index++) {
+        tiles[index].dispatchEvent(new Event('load'));
+      }
+      tiles[tiles.length - 1].dispatchEvent(new Event('error'));
+    });
+
+    expect(container.textContent).not.toContain(baseMapWarning);
+  });
+
+  it('clears a failed tile warning when later tiles load', async () => {
+    const tiles = await openBackgroundMap();
+    await act(async () => tiles[0].dispatchEvent(new Event('error')));
+    await act(async () => {
+      for (let index = 1; index < tiles.length; index++) {
+        tiles[index].dispatchEvent(new Event('load'));
+      }
+    });
+
+    expect(container.textContent).not.toContain(baseMapWarning);
+  });
+
+  it('waits for loading to finish, reports a complete outage, and clears on recovery', async () => {
+    const tiles = await openBackgroundMap();
+    await act(async () => tiles[0].dispatchEvent(new Event('error')));
+    expect(container.textContent).not.toContain(baseMapWarning);
+
+    await act(async () => {
+      for (let index = 1; index < tiles.length; index++) {
+        tiles[index].dispatchEvent(new Event('error'));
+      }
+    });
+    expect(container.textContent).toContain(baseMapWarning);
+    expect(container.querySelectorAll('path.leaflet-interactive').length).toBeGreaterThan(0);
+
+    await act(async () => tiles[0].dispatchEvent(new Event('load')));
+    expect(container.textContent).not.toContain(baseMapWarning);
+  });
+});
 
 describe('Risk map', () => {
   it('toggles dengue cluster and high-Aedes overlays without recreating the map', async () => {
