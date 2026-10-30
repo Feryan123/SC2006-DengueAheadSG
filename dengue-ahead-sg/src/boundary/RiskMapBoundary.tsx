@@ -1,11 +1,13 @@
 // - Show subzone colours, selected-area details and the top 10 assessed areas.
 // - Use Leaflet for the map and RiskMapControl for its data (UC-2).
+// - Show a warning when the map uses saved backup data (Ticket #58).
 
 import { useEffect, useRef, useState } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
 import { createSubzonePopup } from './SubzonePopup.ts';
+import BundledFallbackNotice from './BundledFallbackNotice.tsx';
 import {
   RiskMapControl,
   type MapResult,
@@ -330,6 +332,8 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
           unavailable; it does not mean low risk.
         </p>
       )}
+
+      <BundledFallbackNotice snapshot={data?.snapshot} />
 
       {searchMessage && <p role="status">{searchMessage}</p>}
 

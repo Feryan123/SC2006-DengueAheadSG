@@ -1,5 +1,6 @@
 // - Reuse saved public data for one hour before requesting an update.
 // - If the update fails, use the last good cache, then the bundled backup.
+// - Mark bundled backup data so the screens can show a warning (Ticket #58).
 // - Ticket 13: Proxy for ApprovedPublicDataServiceBoundary; no risk calculations.
 
 import { DatasetStatus } from '../entity/enums.ts';
@@ -35,7 +36,11 @@ export class CachedPublicDataServiceProxy implements ApprovedPublicDataServiceBo
       return snapshot;
     } catch {
       if (cached) return this.markStale(cached.snapshot);
-      if (isPublicDataSnapshot(this.bundledFallback)) return this.markStale(this.bundledFallback);
+      if (isPublicDataSnapshot(this.bundledFallback)) {
+        const backup = this.markStale(this.bundledFallback);
+        backup.isBundledFallback = true;
+        return backup;
+      }
       throw new Error('Public data and its backup are unavailable. Please try again later.');
     }
   }

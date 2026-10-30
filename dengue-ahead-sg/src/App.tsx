@@ -1,5 +1,6 @@
 // - Keep the selected area and assessment while moving between screens.
 // - Connect the real boundary components and handle unavailable data.
+// - Show the backup warning on result and simulation screens (Ticket #58).
 // - Ticket 19: App navigation for UC-1 to UC-5.
 
 import { useState } from 'react';
@@ -9,6 +10,7 @@ import RiskResultBoundary from './boundary/RiskResultBoundary.tsx';
 import SimulationBoundary from './boundary/SimulationBoundary.tsx';
 import PreventionGuidanceBoundary from './boundary/PreventionGuidanceBoundary.tsx';
 import DataUnavailableBoundary from './boundary/DataUnavailableBoundary.tsx';
+import BundledFallbackNotice from './boundary/BundledFallbackNotice.tsx';
 import { RiskMapControl, type MapAssessmentSelection } from './control/RiskMapControl.ts';
 import type { LocationRiskControl } from './control/LocationRiskControl.ts';
 import type { PreventionGuidanceControl } from './control/PreventionGuidanceControl.ts';
@@ -235,7 +237,12 @@ export default function App(props: AppProps = {}) {
           </nav>
         </div>
       </header>
-      <main className="site-main">{showScreen()}</main>
+      <main className="site-main">
+        {screen === 'result' || screen === 'simulation'
+          ? <BundledFallbackNotice snapshot={snapshot} />
+          : null}
+        {showScreen()}
+      </main>
       <footer className="site-footer">
         <p>
           Map: <a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a>
