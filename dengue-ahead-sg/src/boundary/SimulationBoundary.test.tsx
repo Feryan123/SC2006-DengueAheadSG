@@ -146,9 +146,14 @@ describe('SimulationBoundary (ticket 24)', () => {
 
   it('labels steps as percentages, not model terms', async () => {
     await renderSimulation();
+    const ticks = (factor: AdjustableRiskFactorType) =>
+      container.querySelector(`#sim-${factor} ~ .sim-ticks`)?.textContent;
 
-    const ticks = container.querySelector('#sim-HUMIDITY ~ .sim-ticks')?.textContent;
-    expect(ticks).toBe('−20%−10%No change+10%+20%');
+    // Humidity and Aedes are already %, so their steps are percentage points (80% ± 8; 50% ± 5).
+    expect(ticks(AdjustableRiskFactorType.Humidity)).toBe('−16.0%−8.0%No change+8.0%+16.0%');
+    expect(ticks(AdjustableRiskFactorType.HighAedesArea)).toBe('−10%−5%No change+5%+10%');
+    // Rainfall is in mm, so its steps are percent of the current amount (100 mm ± 10).
+    expect(ticks(AdjustableRiskFactorType.LaggedRainfall)).toBe('−20%−10%No change+10%+20%');
     expect(container.textContent).not.toMatch(/standard deviation|SD\b/);
   });
 
@@ -173,7 +178,7 @@ describe('SimulationBoundary (ticket 24)', () => {
     expect(comparison()).toContain('65.0 (High)');
     expect(comparison()).toContain('+25.0');
     expect(comparison()).toContain('Hypothetical scenario only');
-    expect(container.textContent).toContain('Humidity: 96.0% (+20%)');
+    expect(container.textContent).toContain('Humidity: 96.0% (+16.0%)');
     expect(container.textContent).not.toContain('Calculate');
   });
 
@@ -205,12 +210,12 @@ describe('SimulationBoundary (ticket 24)', () => {
     expect(comparison()).not.toContain('Baseline vs simulated risk');
   });
 
-  it('disables a slider whose value is 0, since a % change cannot move it', async () => {
+  it('disables a slider when no step changes its value', async () => {
     await renderSimulation(0);
 
     expect(slider(AdjustableRiskFactorType.HighAedesArea).disabled).toBe(true);
     expect(slider(AdjustableRiskFactorType.Humidity).disabled).toBe(false);
-    expect(container.textContent).toContain("can't be adjusted here");
+    expect(container.textContent).toContain("can't be adjusted for this area");
     expect(container.querySelector('#sim-HIGH_AEDES_AREA ~ .sim-ticks')).toBeNull();
   });
 

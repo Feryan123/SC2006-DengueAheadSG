@@ -34,21 +34,37 @@ export interface SimulationBoundaryProps {
 type FactorType = ScenarioAdjustment['factorType'];
 type Level = ScenarioAdjustment['adjustmentLevel'];
 
-const factors: readonly { type: FactorType; label: string; format: (value: number) => string }[] = [
+/**
+ * `format` shows a value; `change` shows the size of a change (no sign).
+ * Factors already measured in % change by percentage points, so "+10%" means the same
+ * for every area; rainfall (mm) changes by percent of the current amount.
+ */
+const factors: readonly {
+  type: FactorType;
+  label: string;
+  format: (value: number) => string;
+  change: (current: number, adjusted: number) => string;
+}[] = [
   {
     type: AdjustableRiskFactorType.Humidity,
     label: 'Humidity',
     format: (value) => `${value.toFixed(1)}%`,
+    change: (current, adjusted) => `${Math.abs(adjusted - current).toFixed(1)}%`,
   },
   {
     type: AdjustableRiskFactorType.LaggedRainfall,
     label: 'Rainfall 2–3 months ago',
     format: (value) => `${Math.round(value)} mm`,
+    change: (current, adjusted) =>
+      current === 0
+        ? `${Math.round(Math.abs(adjusted - current))} mm`
+        : `${Math.round((Math.abs(adjusted - current) / current) * 100)}%`,
   },
   {
     type: AdjustableRiskFactorType.HighAedesArea,
     label: 'Area overlapping high-Aedes zones',
     format: (value) => `${Math.round(value * 100)}% of the area`,
+    change: (current, adjusted) => `${Math.round(Math.abs(adjusted - current) * 100)}%`,
   },
 ];
 
@@ -62,12 +78,14 @@ function initialLevels(): Record<FactorType, Level> {
   };
 }
 
-/** "+15%", "−8%" or "No change"; values that cannot change relatively fall back to the raw difference. */
-function changeLabel(current: number, adjusted: number, format: (value: number) => string): string {
+/** "+15%", "−8%" or "No change". */
+function changeLabel(
+  current: number,
+  adjusted: number,
+  change: (current: number, adjusted: number) => string,
+): string {
   if (adjusted === current) return 'No change';
-  if (current === 0) return `${adjusted > current ? '+' : '−'}${format(Math.abs(adjusted - current))}`;
-  const percent = Math.round(((adjusted - current) / current) * 100);
-  return `${percent > 0 ? '+' : '−'}${Math.abs(percent)}%`;
+  return `${adjusted > current ? '+' : '−'}${change(current, adjusted)}`;
 }
 
 export function SimulationBoundary({
@@ -180,9 +198,9 @@ export function SimulationBoundary({
           const level = adjustments[factor.type];
           const adjusted = valueOf(factor.type, level);
           const labels = ADJUSTMENT_STEPS.map((step) =>
-            changeLabel(current, valueOf(factor.type, step), factor.format));
+            changeLabel(current, valueOf(factor.type, step), factor.change));
           const step = ADJUSTMENT_STEPS.indexOf(level);
-          // A value of 0 stays 0 under any % change (e.g. no Aedes overlap), so the slider would do nothing.
+          // Every step gives the same value (e.g. no spread to step by), so the slider would do nothing.
           const fixed = labels.every((label) => label === 'No change');
           const id = `sim-${factor.type}`;
 
@@ -204,7 +222,7 @@ export function SimulationBoundary({
                 onChange={(event) => adjustFactor(factor.type, Number(event.target.value))}
               />
               {fixed ? (
-                <p className="muted small">This is 0 for this area, so it can't be adjusted here.</p>
+                <p className="muted small">This factor can't be adjusted for this area.</p>
               ) : (
                 <div className="sim-ticks" aria-hidden="true">
                   {labels.map((label, index) => <span key={ADJUSTMENT_STEPS[index]}>{label}</span>)}
