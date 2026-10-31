@@ -9,6 +9,7 @@ import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
 import BundledFallbackNotice from './BundledFallbackNotice.tsx';
+import DataFreshnessNotice from './DataFreshnessNotice.tsx';
 import type { LocationRiskControl } from '../control/LocationRiskControl.ts';
 import { ValidationStatus } from '../entity/enums.ts';
 import {
@@ -234,10 +235,14 @@ export default function RiskMapBoundary({
     clusterLayer.current = clusters;
     aedesLayer.current = aedes;
 
-    // Remove Leaflet's map and listeners when this screen closes
-    // or its data or control changes.
+    // Stop ongoing map animations before removing Leaflet's map and listeners.
+    // This also runs when the screen closes or its data or control changes.
     return () => {
       baseTiles.off(tileEvents);
+      leafletMap.stop();
+      // Leaflet 1.9.4 leaves a delayed zoom callback after map removal.
+      // Clear this flag so the callback exits before accessing the removed map.
+      (leafletMap as L.Map & { _animatingZoom?: boolean })._animatingZoom = false;
       leafletMap.remove();
       map.current = null;
       areaLayers.current = [];
@@ -369,6 +374,7 @@ export default function RiskMapBoundary({
   return (
     <section aria-label="Dengue risk dashboard">
       <BundledFallbackNotice snapshot={data?.snapshot} />
+      <DataFreshnessNotice snapshot={data?.snapshot} />
       <div hidden={simulationVisible}>
         <div className="dashboard-heading">
           <h1>Check dengue risk in your area</h1>

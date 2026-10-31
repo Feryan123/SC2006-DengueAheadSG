@@ -324,3 +324,11 @@ describe('Single-page dashboard', () => {
     expect(footer.textContent).toContain('Not an official NEA forecast or medical advice.');
   });
 });
+
+describe('Headings (Ticket 60, dashboard layout)', () => {
+  it('has exactly one h1, with prevention guidance as a section under it', async () => {
+    await renderDashboard();
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(container.querySelector('#prevention-heading')?.tagName).toBe('H2');
+  });
+});

@@ -12,6 +12,7 @@ import { RiskMapControl, type MapAssessmentSelection } from './control/RiskMapCo
 import type { LocationRiskControl } from './control/LocationRiskControl.ts';
 import type { PreventionGuidanceControl } from './control/PreventionGuidanceControl.ts';
 import type { RiskSimulationControl } from './control/RiskSimulationControl.ts';
+import { clustersForSubzone } from './control/clustersForSubzone.ts';
 
 export type AppProps = {
   locationControl?: LocationRiskControl;
@@ -95,9 +96,7 @@ export default function App(props: AppProps = {}) {
               embedded
               subzone={selection.subzone}
               assessment={selection.assessment}
-              clusters={selection.snapshot.dengueClusters.filter(
-                (item) => item.subzoneId === selection.subzone.subzoneId,
-              )}
+              clusters={clustersForSubzone(selection.snapshot.dengueClusters, selection.subzone)}
               preventionControl={props.preventionControl}
             />
           ) : (

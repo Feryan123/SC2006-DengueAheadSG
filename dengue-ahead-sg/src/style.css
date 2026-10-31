@@ -155,6 +155,13 @@ input::placeholder { color: #8a9aa3; }
   .toggle-row { min-height: 44px; }
 }
 
+/* Prevention checklist. */
+.prevention-list { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 12px; }
+.prevention-item { overflow: hidden; }
+.prevention-task { width: 100%; text-align: left; border: 0; background: none; color: #173b55; font-weight: 650; font-size: 14px; padding: 16px 20px; }
+.prevention-task:hover { background: #eef3f5; }
+.task-details-panel { border-top: 1px solid var(--border); padding: 16px 20px; font-size: 13px; line-height: 1.5; }
+.task-details-panel p:last-child { margin-bottom: 0; }
 /* One dashboard: the main map stays beside the selected area's preview. */
 .app-shell { background: #faf9f6; }
 .site-main { width: min(100%, 1480px); padding: 32px 32px 48px; }

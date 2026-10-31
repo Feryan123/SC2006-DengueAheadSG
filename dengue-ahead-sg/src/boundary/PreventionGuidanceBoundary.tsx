@@ -58,7 +58,7 @@ export function PreventionGuidanceBoundary({
         };
     }, [guidanceControl]);
 
-    // SelectTask() - handles the user selecting a taskto view details and source info
+    // selectTask() - handles the user selecting a task to view details and source info
     const selectTask = async (taskId: string): Promise<void> => {
         if (selectedDetails?.task.taskId === taskId) {
             setSelectedDetails(null);
@@ -148,12 +148,14 @@ export function PreventionGuidanceBoundary({
                             )
                             .map((task) => {
                                 const isSelected = selectedDetails?.task.taskId === task.taskId;
+                                const panelId = `task-details-${task.taskId}`;
 
                                 return (
                                     <li key={task.taskId}>
                                         <button
                                             type="button"
                                             aria-expanded={isSelected}
+                                            aria-controls={isSelected ? panelId : undefined}
                                             onClick={() => void selectTask(task.taskId)}
                                         >
                                             <PreventionIcon taskId={task.taskId} />
@@ -161,7 +163,7 @@ export function PreventionGuidanceBoundary({
                                         </button>
 
                                         {isSelected && selectedDetails && (
-                                            <div className="task-details-panel">
+                                            <div className="task-details-panel" id={panelId}>
                                                 <p>{selectedDetails.task.explanation}</p>
                                                 <p>
                                                     <strong>Source:</strong>{" "}
