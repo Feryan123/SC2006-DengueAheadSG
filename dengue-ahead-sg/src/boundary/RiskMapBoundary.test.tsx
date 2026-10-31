@@ -199,15 +199,12 @@ describe('Risk map', () => {
     await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={firstAction} />));
     const path = container.querySelector('path.leaflet-interactive')!;
     await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    const popupAction = button('View full assessment');
+    firstAction.mockClear();
     const viewChanges = fitBounds.mock.calls.length;
-
     await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={latestAction} />));
     expect(container.querySelector('path[stroke="#e600a9"]')).toBe(path);
-    expect(button('View full assessment')).toBe(popupAction);
-    expect(container.querySelector('select')?.value).toBe(snapshot.subzones[0].subzoneId);
     expect(fitBounds).toHaveBeenCalledTimes(viewChanges);
-    await act(async () => popupAction.click());
+    await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(firstAction).not.toHaveBeenCalled();
     expect(latestAction).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
       expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
@@ -225,20 +222,18 @@ describe('Risk map', () => {
     expect(container.textContent).toContain('Singapore Land Authority');
   });
 
-  it('selects a clicked area, shows its level and passes its ID to the result action', async () => {
+  it('selects a clicked area and immediately passes its assessment to the dashboard', async () => {
     const { snapshot, control } = await mapWithAssessments();
     const onRequestAssessment = vi.fn();
     await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={onRequestAssessment} />));
     const path = container.querySelector('path.leaflet-interactive')!;
     await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.querySelector('.map-summary')?.textContent).toContain(snapshot.subzones[0].name);
-    expect(container.querySelector('.map-summary .risk-pill')?.textContent).toBe('Low');
+    expect(container.querySelector('select')?.value).toBe(snapshot.subzones[0].subzoneId);
     expect(path.getAttribute('stroke-width')).toBe('3');
     expect(path.getAttribute('stroke')).toBe('#e600a9');
     expect(path.getAttribute('stroke-dasharray')).toBeNull();
-    await act(async () => button('View Assessment').click());
     expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
-      expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
+      expect.objectContaining({ assessment: expect.objectContaining({ riskLevel: RiskLevel.Low }), snapshot }));
   });
 
   it('uses dashed purple boundaries and restores them when another area is selected', async () => {
@@ -255,34 +250,28 @@ describe('Risk map', () => {
     expect(paths[1].getAttribute('stroke-dasharray')).toBeNull();
   });
 
-  it('allows keyboard selection and does not offer an assessment for an unassessed area', async () => {
+  it('allows keyboard selection and reports an unassessed area without inventing a score', async () => {
     const { snapshot, control } = await mapWithAssessments();
-    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
+    const selected = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={selected} />));
     const select = container.querySelector('select')!;
-    await act(async () => {
-      select.value = snapshot.subzones[3].subzoneId;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    expect(container.querySelector('.map-summary .risk-pill')?.textContent).toBe('Very High');
-    await act(async () => {
-      select.value = snapshot.subzones[4].subzoneId;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    expect(container.querySelector('.map-summary .risk-pill')?.textContent).toBe('Risk unavailable');
-    expect(button('View Assessment').disabled).toBe(true);
+    await act(async () => { select.value = snapshot.subzones[3].subzoneId; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(selected).toHaveBeenLastCalledWith(snapshot.subzones[3].subzoneId,
+      expect.objectContaining({ assessment: expect.objectContaining({ riskLevel: RiskLevel.VeryHigh }) }));
+    await act(async () => { select.value = snapshot.subzones[4].subzoneId; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(selected).toHaveBeenLastCalledWith(snapshot.subzones[4].subzoneId, undefined);
   });
 
   it('draws all official subzone outlines and does not invent risk colours', async () => {
     const outlines = JSON.parse(officialOutlinesJson);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => outlines }));
     await act(async () => root.render(<StrictMode><RiskMapBoundary onRequestAssessment={() => {}} /></StrictMode>));
-    expect(container.textContent).toContain('Official subzone outlines are shown');
+    expect(container.textContent).toContain('Official outlines are shown');
     expect(container.querySelectorAll('.leaflet-container')).toHaveLength(1);
     const paths = [...container.querySelectorAll('path.leaflet-interactive')];
     expect(paths).toHaveLength(332);
     expect(container.querySelectorAll('select option')).toHaveLength(333);
     expect(paths.every((path) => path.getAttribute('fill') === '#d9d9d9')).toBe(true);
-    expect(button('View Assessment').disabled).toBe(true);
     expect([...container.querySelectorAll('input[type="checkbox"]')].every((input) => (input as HTMLInputElement).disabled)).toBe(true);
   });
 
@@ -309,32 +298,22 @@ describe('Risk map', () => {
       expect(paths.filter((path) => path.getAttribute('fill') === style.colour)).toHaveLength(83);
     }
     await act(async () => paths[0].dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.querySelector('.map-summary .risk-pill')?.textContent).toBe('Low');
-    await act(async () => button('View Assessment').click());
     expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(boundaries[0].subzoneId,
       expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
   });
 
-  it('searches by area name and clears selection when no area matches', async () => {
+  it('searches by area name and keeps a valid selection when the next search fails', async () => {
     const { snapshot, control } = await mapWithAssessments();
     await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
-    const input = container.querySelector('input:not([type="checkbox"])') as HTMLInputElement;
-    // Use the native setter so React receives the same change as typing.
+    const input = container.querySelector('input[type="search"]') as HTMLInputElement;
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-    await act(async () => {
-      setValue.call(input, '  tampines  ');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-    expect(container.querySelector('.map-summary')?.textContent).toContain(snapshot.subzones[0].name);
-    await act(async () => {
-      setValue.call(input, 'no such area');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await act(async () => button('Search').click());
+    await act(async () => { setValue.call(input, '  tampines  '); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(container.querySelector('select')?.value).toBe(snapshot.subzones[0].subzoneId);
+    await act(async () => { setValue.call(input, 'no such area'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => button('Search area').click());
     expect(container.textContent).toContain('No matching area');
-    expect(container.querySelector('select')?.value).toBe('');
-    expect(button('View Assessment').disabled).toBe(true);
+    expect(container.querySelector('select')?.value).toBe(snapshot.subzones[0].subzoneId);
     expect(container.querySelector('.leaflet-popup')).toBeNull();
   });
 
@@ -366,65 +345,50 @@ describe('Risk map', () => {
     await act(async () => path.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
     expect(container.querySelector('.leaflet-tooltip')?.textContent).toContain('<img id="unsafe-name" src="x">');
     await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.querySelector('.subzone-popup h3')?.textContent).toBe('<img id="unsafe-name" src="x">');
+    expect(container.querySelector('select option:checked')?.textContent).toBe('<img id="unsafe-name" src="x">');
     expect(container.querySelector('#unsafe-name')).toBeNull();
   });
 });
 
 describe('Map details (ticket #22)', () => {
-  it('opens a popup with the level, three largest factors and the correct result action', async () => {
+  it('passes the full assessment directly without a popup clipping the map', async () => {
     const { snapshot, assessments, control } = await mapWithAssessments();
     assessments[0].contributions = Object.values(RiskFactorType).map((factorType, index) => ({
       factorType, inputValue: 1, contribution: (index + 1) * 5,
       contributionLevel: ContributionLevel.Moderate, explanation: '',
     }));
-    const onRequestAssessment = vi.fn();
-    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={onRequestAssessment} />));
+    const selected = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={selected} />));
     await act(async () => container.querySelector('path.leaflet-interactive')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    const popup = container.querySelector('.subzone-popup')!;
-    expect(popup.querySelector('h3')?.textContent).toBe(snapshot.subzones[0].name);
-    expect(popup.querySelector('.risk-pill')?.textContent).toBe('Low');
-    expect(popup.textContent).toContain('Risk index: 50.0');
-    expect([...popup.querySelectorAll('li')].map((item) => item.textContent)).toEqual([
-      'Lagged rainfall: 25.0 points', 'Humidity: 20.0 points', 'Population density: 15.0 points',
-    ]);
-    await act(async () => button('View full assessment').click());
-    expect(onRequestAssessment).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
-      expect.objectContaining({ subzone: snapshot.subzones[0], snapshot }));
+    expect(container.querySelector('.leaflet-popup')).toBeNull();
+    expect(selected).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[0].subzoneId,
+      expect.objectContaining({ assessment: assessments[0], subzone: snapshot.subzones[0], snapshot }));
   });
 
-  it('shows unavailable details and disables the result action for an unassessed area', async () => {
-    const { control } = await mapWithAssessments();
-    const onRequestAssessment = vi.fn();
-    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={onRequestAssessment} />));
-    const path = container.querySelectorAll('path.leaflet-interactive')[4];
-    await act(async () => path.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    const popup = container.querySelector('.subzone-popup')!;
-    expect(popup.textContent).toContain('Risk unavailable');
-    expect(popup.textContent).toContain('No risk assessment is available');
-    expect(popup.textContent).not.toContain('Risk index:');
-    expect(popup.querySelectorAll('li')).toHaveLength(0);
-    expect(button('View full assessment').disabled).toBe(true);
-    await act(async () => button('View full assessment').click());
-    expect(onRequestAssessment).not.toHaveBeenCalled();
+  it('reports unavailable assessment context for an unassessed area', async () => {
+    const { snapshot, control } = await mapWithAssessments();
+    const selected = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={selected} />));
+    await act(async () => container.querySelectorAll('path.leaflet-interactive')[4].dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(selected).toHaveBeenCalledExactlyOnceWith(snapshot.subzones[4].subzoneId, undefined);
+    expect(container.querySelector('.leaflet-popup')).toBeNull();
   });
 
-  it('lists assessed areas by highest index and opens their map popup from the list', async () => {
+  it('shows the top three initially, expands all ten and selects directly from the ranking', async () => {
     const { snapshot, assessments, control } = await mapWithAssessments();
     assessments.forEach((item, index) => { item.riskIndex = (index + 1) * 20; });
-    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={() => {}} />));
-    const items = [...container.querySelectorAll('.top-risk-list button')];
-    expect(items.map((item) => item.querySelector('span')?.textContent)).toEqual(
-      snapshot.subzones.slice(0, 4).reverse().map((zone) => zone.name),
-    );
-    await act(async () => (items[0] as HTMLButtonElement).click());
+    const selected = vi.fn();
+    await act(async () => root.render(<RiskMapBoundary control={control} onRequestAssessment={selected} />));
+    expect(container.querySelectorAll('.top-risk-list button')).toHaveLength(3);
+    await act(async () => button('View all 10').click());
+    const items = [...container.querySelectorAll<HTMLButtonElement>('.top-risk-list button')];
+    expect(items.map((item) => item.querySelector('strong')?.textContent?.replace(/^\d+\. /, ''))).toEqual(snapshot.subzones.slice(0, 4).reverse().map((zone) => zone.name));
+    expect(items[0].style.backgroundColor).toBe('rgb(33, 113, 181)');
+    expect(items[0].style.color).toBe('rgb(255, 255, 255)');
+    await act(async () => items[0].click());
     expect(container.querySelector('select')?.value).toBe(snapshot.subzones[3].subzoneId);
-    expect(container.querySelector('.subzone-popup h3')?.textContent).toBe(snapshot.subzones[3].name);
-    expect(container.querySelector('.subzone-popup')?.textContent).toContain('Factor details are unavailable.');
-    await act(async () => (container.querySelector('.leaflet-popup-close-button') as HTMLElement).click());
+    expect(selected).toHaveBeenLastCalledWith(snapshot.subzones[3].subzoneId, expect.objectContaining({ snapshot }));
     expect(container.querySelector('.leaflet-popup')).toBeNull();
-    await act(async () => (items[0] as HTMLButtonElement).click());
-    expect(container.querySelector('.subzone-popup h3')?.textContent).toBe(snapshot.subzones[3].name);
   });
 
   it('shows an empty ranking instead of inventing risk scores', async () => {

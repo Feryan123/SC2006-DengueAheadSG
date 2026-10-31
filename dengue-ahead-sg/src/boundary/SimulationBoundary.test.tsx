@@ -1,232 +1,202 @@
 // @vitest-environment jsdom
-
+// - Check exact values, linked sliders, validation, reset and delayed replies.
+// - Use simulated calculation replies without live API calls.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SimulationBoundary } from './SimulationBoundary.tsx';
-import {
-  AdjustableRiskFactorType,
-  AdjustmentLevel,
-  RiskLevel,
-} from '../entity/enums.ts';
+import { AdjustableRiskFactorType as F, RiskLevel } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
-import {
-  ADJUSTMENT_STEPS,
-  type RiskSimulationControl,
-  type SimulationResult,
-} from '../control/RiskSimulationControl.ts';
+import type { RiskSimulationControl, SimulationResult } from '../control/RiskSimulationControl.ts';
 import type { PublicDataSnapshot } from '../services/ApprovedPublicDataServiceBoundary.ts';
-
 const baseline = {
-  assessmentId: 'baseline-1',
-  subzoneId: 'subzone-1',
+  assessmentId: 'baseline',
+  subzoneId: 'one',
   riskIndex: 40,
   riskLevel: RiskLevel.Moderate,
 } as RiskAssessment;
-
-function assessment(riskIndex: number, riskLevel: RiskLevel): RiskAssessment {
-  return { ...baseline, assessmentId: `simulated-${riskIndex}`, riskIndex, riskLevel };
-}
-
-function resultFor(simulated: RiskAssessment): SimulationResult {
+const snapshot = {
+  weather: { meanHumidityPct: 80, rainfallMm: 100 },
+  subzones: [{ subzoneId: 'one', aedesOverlapRatio: 0.5 }],
+} as PublicDataSnapshot;
+function reply(score: number): SimulationResult {
   return {
     baseline,
-    simulated,
+    simulated: { ...baseline, riskIndex: score, riskLevel: RiskLevel.High },
     scenario: {
-      scenarioId: 'scenario-1',
-      createdAt: '2026-10-28T00:00:00.000Z',
-      baselineAssessmentId: 'baseline-1',
-      simulatedAssessmentId: simulated.assessmentId,
+      scenarioId: 'sim',
+      createdAt: '2026-10-31',
+      baselineAssessmentId: 'baseline',
       isHypothetical: true,
       adjustments: [],
     },
   };
 }
-
-const snapshot = {} as PublicDataSnapshot;
-
-/** Current values: humidity 80%, rainfall 100 mm, Aedes overlap 50% (or `aedes`). Each step moves 10%. */
-function fakeAdjustedValue(aedes = 0.5) {
-  const current = {
-    [AdjustableRiskFactorType.Humidity]: 80,
-    [AdjustableRiskFactorType.LaggedRainfall]: 100,
-    [AdjustableRiskFactorType.HighAedesArea]: aedes,
-  };
-  return (_s: PublicDataSnapshot, _id: string, factor: AdjustableRiskFactorType, level: AdjustmentLevel) =>
-    current[factor] * (1 + 0.1 * (ADJUSTMENT_STEPS.indexOf(level) - 2));
-}
-
-let container: HTMLDivElement;
-let root: Root;
-let recalculateScenario: ReturnType<typeof vi.fn>;
-
+let container: HTMLDivElement, root: Root, calculate: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
     configurable: true,
     value: true,
   });
-
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-
-  recalculateScenario = vi.fn().mockResolvedValue(resultFor(assessment(65, RiskLevel.High)));
+  calculate = vi.fn().mockResolvedValue(reply(65));
 });
-
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.restoreAllMocks();
 });
-
-async function renderSimulation(aedes?: number) {
-  const simulationControl = {
-    recalculateScenario,
-    adjustedValue: fakeAdjustedValue(aedes),
+async function render(data = snapshot) {
+  const control = {
+    recalculateScenario: calculate,
+    adjustedValue: () => 140,
   } as unknown as RiskSimulationControl;
-
-  await act(async () => {
+  await act(async () =>
     root.render(
-      <SimulationBoundary
-        baseline={baseline}
-        snapshot={snapshot}
-        simulationControl={simulationControl}
-      />,
-    );
-  });
-}
-
-function slider(factor: AdjustableRiskFactorType): HTMLInputElement {
-  const input = container.querySelector<HTMLInputElement>(`#sim-${factor}`);
-  if (!input) throw new Error(`Missing slider: ${factor}`);
-  return input;
-}
-
-/** Move a slider the way a drag or arrow key does: set the value, then fire the input event React listens to. */
-async function moveSlider(factor: AdjustableRiskFactorType, level: AdjustmentLevel) {
-  const input = slider(factor);
-  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-  await act(async () => {
-    setValue.call(input, String(ADJUSTMENT_STEPS.indexOf(level)));
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-}
-
-async function clickButton(label: string) {
-  const button = [...container.querySelectorAll('button')].find(
-    (item) => item.textContent?.trim() === label,
+      <SimulationBoundary baseline={baseline} snapshot={data} simulationControl={control} />,
+    ),
   );
-  if (!button) throw new Error(`Missing button: ${label}`);
-  await act(async () => button.click());
 }
-
+function input(type: F, kind = 'value') {
+  return container.querySelector<HTMLInputElement>(`#${kind}-${type}`)!;
+}
+async function change(type: F, value: string, kind = 'value') {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => {
+    setter.call(input(type, kind), value);
+    input(type, kind).dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+async function reset() {
+  await act(async () =>
+    [...container.querySelectorAll('button')]
+      .find((b) => b.textContent === 'Reset to baseline')!
+      .click(),
+  );
+}
 function comparison() {
   return container.querySelector('[aria-label="Simulation comparison"]')?.textContent ?? '';
 }
-
-describe('SimulationBoundary (ticket 24)', () => {
-  it('shows one 5-step slider per adjustable factor, starting at No change', async () => {
-    await renderSimulation();
-
-    for (const factor of Object.values(AdjustableRiskFactorType)) {
-      const input = slider(factor);
-      expect(input.type).toBe('range');
-      expect(input.min).toBe('0');
-      expect(input.max).toBe('4');
-      expect(input.value).toBe(String(ADJUSTMENT_STEPS.indexOf(AdjustmentLevel.NoChange)));
-    }
+describe('Exact-value risk simulation', () => {
+  it('starts at the baseline without recalculation', async () => {
+    await render();
+    expect(input(F.Humidity).value).toBe('80');
+    expect(input(F.LaggedRainfall).value).toBe('100');
+    expect(input(F.HighAedesArea).value).toBe('50');
+    expect(calculate).not.toHaveBeenCalled();
+    expect(comparison()).toContain('40.0');
   });
-
-  it('labels steps as percentages, not model terms', async () => {
-    await renderSimulation();
-    const ticks = (factor: AdjustableRiskFactorType) =>
-      container.querySelector(`#sim-${factor} ~ .sim-ticks`)?.textContent;
-
-    // Humidity and Aedes are already %, so their steps are percentage points (80% ± 8; 50% ± 5).
-    expect(ticks(AdjustableRiskFactorType.Humidity)).toBe('−16.0%−8.0%No change+8.0%+16.0%');
-    expect(ticks(AdjustableRiskFactorType.HighAedesArea)).toBe('−10%−5%No change+5%+10%');
-    // Rainfall is in mm, so its steps are percent of the current amount (100 mm ± 10).
-    expect(ticks(AdjustableRiskFactorType.LaggedRainfall)).toBe('−20%−10%No change+10%+20%');
-    expect(container.textContent).not.toMatch(/standard deviation|SD\b/);
-  });
-
-  it('shows the current risk without calculating while every slider is at No change', async () => {
-    await renderSimulation();
-
-    expect(recalculateScenario).not.toHaveBeenCalled();
-    expect(comparison()).toContain('40.0 (Moderate)');
-    expect(container.querySelector('[role="alert"]')).toBeNull();
-  });
-
-  it('recalculates as soon as a slider moves, with no calculate button', async () => {
-    await renderSimulation();
-    await moveSlider(AdjustableRiskFactorType.Humidity, AdjustmentLevel.LargeIncrease);
-
-    expect(recalculateScenario).toHaveBeenLastCalledWith(
+  it('immediately sends an exact decimal value to the calculator', async () => {
+    await render();
+    await change(F.Humidity, '81.25');
+    expect(calculate).toHaveBeenLastCalledWith(
       baseline,
-      [{ factorType: AdjustableRiskFactorType.Humidity, adjustmentLevel: AdjustmentLevel.LargeIncrease }],
+      [{ factorType: F.Humidity, value: 81.25 }],
       snapshot,
     );
-    expect(comparison()).toContain('Baseline vs simulated risk');
-    expect(comparison()).toContain('65.0 (High)');
+    expect(comparison()).toContain('65.0');
     expect(comparison()).toContain('+25.0');
-    expect(comparison()).toContain('Hypothetical scenario only');
-    expect(container.textContent).toContain('Humidity: 96.0% (+16.0%)');
-    expect(container.textContent).not.toContain('Calculate');
+    expect(input(F.Humidity, 'sim').value).toBe('81.25');
   });
-
-  it('shows the latest move even if an earlier calculation finishes last', async () => {
-    let finishSlow!: (value: SimulationResult) => void;
-    recalculateScenario
-      .mockReturnValueOnce(new Promise((resolve) => { finishSlow = resolve; }))
-      .mockResolvedValueOnce(resultFor(assessment(70, RiskLevel.High)));
-
-    await renderSimulation();
-    await moveSlider(AdjustableRiskFactorType.Humidity, AdjustmentLevel.Increase);
-    await moveSlider(AdjustableRiskFactorType.Humidity, AdjustmentLevel.LargeIncrease);
-    await act(async () => finishSlow(resultFor(assessment(50, RiskLevel.High))));
-
+  it('links the slider to the number field and converts Aedes percentage to a ratio', async () => {
+    await render();
+    await change(F.HighAedesArea, '12.3', 'sim');
+    expect(input(F.HighAedesArea).value).toBe('12.3');
+    expect(calculate.mock.calls.at(-1)?.[1][0].value).toBeCloseTo(0.123);
+  });
+  it('allows changing zero Aedes overlap', async () => {
+    const data = { ...snapshot, subzones: [{ ...snapshot.subzones[0], aedesOverlapRatio: 0 }] };
+    await render(data);
+    await change(F.HighAedesArea, '20');
+    expect(calculate).toHaveBeenLastCalledWith(
+      baseline,
+      [{ factorType: F.HighAedesArea, value: 0.2 }],
+      data,
+    );
+  });
+  it('extends the rain slider without shrinking it during a drag', async () => {
+    await render();
+    await change(F.LaggedRainfall, '800.5');
+    expect(input(F.LaggedRainfall, 'sim').max).toBe('850');
+    await change(F.LaggedRainfall, '300', 'sim');
+    expect(input(F.LaggedRainfall).value).toBe('300');
+    expect(input(F.LaggedRainfall, 'sim').max).toBe('850');
+  });
+  it.each([
+    [F.Humidity, '101'],
+    [F.HighAedesArea, '-1'],
+    [F.HighAedesArea, '101'],
+    [F.LaggedRainfall, '-2'],
+    [F.Humidity, ''],
+  ])('rejects invalid %s input %s without showing an old result', async (type, value) => {
+    await render();
+    await change(F.Humidity, '85');
+    calculate.mockClear();
+    await change(type, value);
+    expect(calculate).not.toHaveBeenCalled();
+    expect(input(type).getAttribute('aria-invalid')).toBe('true');
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(comparison()).not.toContain('65.0');
+  });
+  it('accepts zero and 100 percent', async () => {
+    await render();
+    await change(F.Humidity, '0');
+    await change(F.HighAedesArea, '100');
+    expect(calculate).toHaveBeenLastCalledWith(
+      baseline,
+      [
+        { factorType: F.Humidity, value: 0 },
+        { factorType: F.HighAedesArea, value: 1 },
+      ],
+      snapshot,
+    );
+  });
+  it('ignores an older calculation that finishes after a newer one', async () => {
+    let finish!: (r: SimulationResult) => void;
+    calculate
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(reply(70));
+    await render();
+    await change(F.Humidity, '85');
+    await change(F.Humidity, '90');
+    await act(async () => finish(reply(50)));
     expect(comparison()).toContain('70.0');
     expect(comparison()).not.toContain('50.0');
   });
-
-  it('resets every slider to No change and clears the comparison', async () => {
-    await renderSimulation();
-    await moveSlider(AdjustableRiskFactorType.LaggedRainfall, AdjustmentLevel.Decrease);
-    expect(comparison()).toContain('Baseline vs simulated risk');
-
-    await clickButton('Reset to baseline');
-
-    for (const factor of Object.values(AdjustableRiskFactorType)) {
-      expect(slider(factor).value).toBe(String(ADJUSTMENT_STEPS.indexOf(AdjustmentLevel.NoChange)));
-    }
-    expect(comparison()).not.toContain('Baseline vs simulated risk');
+  it('reset restores every input and ignores an unfinished reply', async () => {
+    let finish!: (r: SimulationResult) => void;
+    calculate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    await render();
+    await change(F.Humidity, '85');
+    await reset();
+    await act(async () => finish(reply(65)));
+    expect(input(F.Humidity).value).toBe('80');
+    expect(input(F.LaggedRainfall).value).toBe('100');
+    expect(input(F.HighAedesArea).value).toBe('50');
+    expect(comparison()).not.toContain('65.0');
   });
-
-  it('disables a slider when no step changes its value', async () => {
-    await renderSimulation(0);
-
-    expect(slider(AdjustableRiskFactorType.HighAedesArea).disabled).toBe(true);
-    expect(slider(AdjustableRiskFactorType.Humidity).disabled).toBe(false);
-    expect(container.textContent).toContain("can't be adjusted for this area");
-    expect(container.querySelector('#sim-HIGH_AEDES_AREA ~ .sim-ticks')).toBeNull();
-  });
-
-  it('shows an error when simulation calculation fails', async () => {
-    recalculateScenario.mockRejectedValue(new Error('Internal simulation failure'));
-
-    await renderSimulation();
-    await moveSlider(AdjustableRiskFactorType.Humidity, AdjustmentLevel.Increase);
-
-    expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain('Simulation could not be calculated');
-    expect(container.textContent).not.toContain('Internal simulation failure');
+  it('shows safe errors and recovers after another valid input', async () => {
+    calculate
+      .mockRejectedValueOnce(new Error('Private calculation detail'))
+      .mockResolvedValueOnce(reply(70));
+    await render();
+    await change(F.Humidity, '85');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      'Simulation could not be calculated',
+    );
+    expect(container.textContent).not.toContain('Private calculation detail');
+    await change(F.Humidity, '90');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(comparison()).toContain('70.0');
   });
 });

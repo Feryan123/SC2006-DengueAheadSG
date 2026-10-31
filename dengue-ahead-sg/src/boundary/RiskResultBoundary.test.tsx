@@ -132,7 +132,8 @@ describe('RiskResultBoundary (ticket 18)', () => {
     [RiskLevel.VeryHigh, 'Your area is VERY HIGH risk: act today'],
   ])('names %s in the tips heading', async (level, heading) => {
     await renderResult({ assessment: makeAssessment({ riskLevel: level }) });
-    expect(container.querySelector('#tips-heading')?.textContent).toBe(heading);
+    expect(container.querySelector('#tips-heading')?.textContent).toContain('Recommended for');
+    expect(container.querySelector('.area-recommendations')?.textContent).toContain(heading);
   });
 
   it('puts the tips section after the contributions', async () => {

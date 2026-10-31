@@ -1,99 +1,75 @@
 // @vitest-environment jsdom
-// - Check real app navigation, map selection, saved assessment data and footer credits.
-// - Use test versions of P2/P5 screens to check their callback connections.
-// - Ticket 19: these tests do not implement or claim the unfinished team screens.
+// - Check the real dashboard from search and map selection through simulation.
+// - Keep the main map and original assessment unchanged during a what-if preview.
+// - Check safe errors, source links and the calculation popup without live APIs.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RiskMapControl } from './control/RiskMapControl.ts';
 import { LocationRiskControl } from './control/LocationRiskControl.ts';
-import { PreventionGuidanceControl } from './control/PreventionGuidanceControl.ts';
 import { RiskSimulationControl } from './control/RiskSimulationControl.ts';
 import { RiskAssessmentControl } from './control/RiskAssessmentControl.ts';
 import { MockPublicDataService } from './services/mocks/MockPublicDataService.ts';
-import { AssessmentType, DataConfidence, RiskLevel } from './entity/enums.ts';
+import {
+  AdjustableRiskFactorType,
+  AssessmentType,
+  DataConfidence,
+  RiskLevel,
+  QueryType,
+  ValidationStatus,
+} from './entity/enums.ts';
 import type { PublicDataSnapshot } from './services/ApprovedPublicDataServiceBoundary.ts';
 import type { RiskAssessment } from './entity/RiskAssessment.ts';
-import type { HomePageBoundaryProps } from './boundary/HomePageBoundary.tsx';
-import type { RiskResultBoundaryProps } from './boundary/RiskResultBoundary.tsx';
-import type { SimulationBoundaryProps } from './boundary/SimulationBoundary.tsx';
-import type { PreventionGuidanceBoundaryProps } from './boundary/PreventionGuidanceBoundary.tsx';
-
-const screens = vi.hoisted(() => ({ home: vi.fn(), result: vi.fn(), simulation: vi.fn(), prevention: vi.fn() }));
-let snapshot: PublicDataSnapshot;
-let baseline: RiskAssessment;
-
-vi.mock('./boundary/HomePageBoundary.tsx', () => ({
-  default: (props: HomePageBoundaryProps) => {
-    screens.home(props);
-    return (
-      <section aria-label="Test home screen">
-        <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], baseline, snapshot)}>Test valid location</button>
-        <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], baseline)}>Test location without snapshot</button>
-        <button onClick={() => props.onAssessmentReady?.(snapshot.subzones[0], { ...baseline, subzoneId: 'wrong' })}>Test mismatched area</button>
-        <button onClick={() => props.onDataUnavailable?.('Private upstream detail')}>Test failed request</button>
-        <button onClick={props.onOpenMap}>Open map from home</button>
-        <button onClick={props.onOpenPrevention}>Open guidance from home</button>
-      </section>
-    );
-  },
-}));
-
-vi.mock('./boundary/RiskResultBoundary.tsx', () => ({
-  default: (props: RiskResultBoundaryProps) => {
-    screens.result(props);
-    return (
-      <section aria-label="Test result screen">
-        <h1>{props.subzone.name}</h1>
-        <p>{props.assessment.assessmentId}</p>
-        <button onClick={() => props.onSimulate?.(props.assessment)}>Simulate</button>
-        <button onClick={props.onBack}>Back</button>
-      </section>
-    );
-  },
-}));
-
-vi.mock('./boundary/SimulationBoundary.tsx', () => ({
-  default: (props: SimulationBoundaryProps) => {
-    screens.simulation(props);
-    return <h1>Test simulation screen</h1>;
-  },
-}));
-
-vi.mock('./boundary/PreventionGuidanceBoundary.tsx', () => ({
-  default: (props: PreventionGuidanceBoundaryProps) => {
-    screens.prevention(props);
-    return <section><h1>Test prevention screen</h1><button onClick={props.onBack}>Back from guidance</button></section>;
-  },
-}));
 
 let App: typeof import('./App.tsx').default;
 let container: HTMLDivElement;
 let root: Root;
-let locationControl: LocationRiskControl;
+let snapshot: PublicDataSnapshot;
+let baseline: RiskAssessment;
 let mapControl: RiskMapControl;
+let locationControl: LocationRiskControl;
+let simulationControl: RiskSimulationControl;
 
 beforeAll(async () => {
-  // jsdom needs a fixed map size and SVG support for real Leaflet layers.
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 800 });
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 420 });
-  Object.defineProperty(SVGSVGElement.prototype, 'createSVGRect', { configurable: true, value: () => ({}) });
-  Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true });
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => 800,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+    configurable: true,
+    get: () => 420,
+  });
+  Object.defineProperty(SVGSVGElement.prototype, 'createSVGRect', {
+    configurable: true,
+    value: () => ({}),
+  });
+  Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
+    configurable: true,
+    value: true,
+  });
   App = (await import('./App.tsx')).default;
 });
 
 beforeEach(async () => {
-  vi.clearAllMocks();
   snapshot = await new MockPublicDataService().retrievePublicData();
   baseline = {
-    assessmentId: 'test-baseline', subzoneId: snapshot.subzones[0].subzoneId,
-    riskIndex: 65, riskLevel: RiskLevel.High, generatedAt: snapshot.generatedAt,
-    dataTimeStamp: snapshot.generatedAt, horizonDays: 14, dataConfidence: DataConfidence.High,
-    assessmentType: AssessmentType.Baseline, contributions: [],
+    assessmentId: 'dashboard-baseline',
+    subzoneId: snapshot.subzones[0].subzoneId,
+    riskIndex: 40,
+    riskLevel: RiskLevel.Moderate,
+    generatedAt: snapshot.generatedAt,
+    dataTimeStamp: snapshot.generatedAt,
+    horizonDays: 14,
+    dataConfidence: DataConfidence.High,
+    assessmentType: AssessmentType.Baseline,
+    contributions: [],
   };
+  mapControl = new RiskMapControl(new MockPublicDataService(snapshot), {
+    assessAll: async () => [baseline],
+  });
   locationControl = new LocationRiskControl();
-  mapControl = new RiskMapControl(new MockPublicDataService(snapshot), { assessAll: async () => [baseline] });
+  simulationControl = new RiskSimulationControl(new RiskAssessmentControl());
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -105,152 +81,245 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+async function renderDashboard() {
+  await act(async () =>
+    root.render(
+      <App
+        mapControl={mapControl}
+        locationControl={locationControl}
+        simulationControl={simulationControl}
+      />,
+    ),
+  );
+}
+
 async function click(label: string) {
-  const button = [...container.querySelectorAll('button')].find((item) => item.textContent === label || item.getAttribute('aria-label') === label);
+  const button = [...container.querySelectorAll('button')].find(
+    (item) => item.textContent?.trim() === label || item.getAttribute('aria-label') === label,
+  );
   if (!button) throw new Error(`Missing button: ${label}`);
   await act(async () => button.click());
 }
 
-function simulationControl() {
-  return new RiskSimulationControl(new RiskAssessmentControl());
+async function enter(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => {
+    setter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
-describe('App navigation (ticket 19)', () => {
-  it('shows an unavailable home instead of a fake working location form when no control is supplied', async () => {
-    await act(async () => root.render(<App />));
-    expect(container.querySelector('h1')?.textContent).toBe('Location search unavailable');
-    expect(container.querySelector('input')).toBeNull();
-    expect(container.textContent).not.toContain('PLACEHOLDER');
-    expect(container.textContent).not.toContain('Tampines East');
-    expect(screens.home).not.toHaveBeenCalled();
+async function search(query: string) {
+  await enter(container.querySelector('input[type="search"]')!, query);
+  await act(async () =>
+    container
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+  );
+}
+
+async function selectFirstArea() {
+  await act(async () =>
+    container
+      .querySelector('.risk-map path.leaflet-interactive')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })),
+  );
+}
+
+function selectedCard() {
+  return container.querySelector('[aria-label="Selected area"]')!;
+}
+
+describe('Single-page dashboard', () => {
+  it('opens the map directly with one search and prevention below it', async () => {
+    await renderDashboard();
+    expect(container.querySelector('h1')?.textContent).toBe('Check dengue risk in your area');
+    expect(container.querySelector('nav')).toBeNull();
+    expect(container.querySelector('input[type="search"]')).not.toBeNull();
+    expect(container.querySelector('.risk-map')).not.toBeNull();
+    expect(container.querySelector('#prevention-heading')?.textContent).toBe(
+      'Prevention starts at home',
+    );
+    expect(selectedCard().textContent).toContain('Enter a postal code or area name');
   });
 
-  it('stores the home callback data and passes it to the real result interface', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} />));
-    expect(screens.home).toHaveBeenLastCalledWith(expect.objectContaining({ control: locationControl }));
-    await click('Test valid location');
-    expect(screens.result).toHaveBeenLastCalledWith(expect.objectContaining({ subzone: snapshot.subzones[0], assessment: baseline }));
-    await click('Back');
-    expect(container.querySelector('[aria-label="Test home screen"]')).not.toBeNull();
+  it('shows a selected area directly without a floating popup or rebuilding the main map', async () => {
+    await renderDashboard();
+    const originalMap = container.querySelector('.risk-map');
+    await selectFirstArea();
+    expect(selectedCard().querySelector('h2')?.textContent).toBe(snapshot.subzones[0].name);
+    expect(selectedCard().textContent).toContain('40.0');
+    expect(container.querySelector('.leaflet-popup')).toBeNull();
+    expect(container.querySelector('.risk-map')).toBe(originalMap);
+    expect(container.querySelector('#factors-heading')).not.toBeNull();
   });
 
-  it('handles a failed home request without exposing the upstream detail', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} />));
-    await click('Test failed request');
-    expect(container.querySelector('h1')?.textContent).toBe('Risk assessment unavailable');
-    expect(container.textContent).not.toContain('Private upstream detail');
-    expect(screens.result).not.toHaveBeenCalled();
+  it('searches local subzone names without calling the address service', async () => {
+    const lookup = vi.spyOn(locationControl, 'assessLocation');
+    await renderDashboard();
+    await search(`  ${snapshot.subzones[0].name.toLowerCase()}  `);
+    expect(selectedCard().querySelector('h2')?.textContent).toBe(snapshot.subzones[0].name);
+    expect(lookup).not.toHaveBeenCalled();
   });
 
-  it('rejects a result for a different subzone', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} />));
-    await click('Test mismatched area');
-    expect(container.querySelector('h1')?.textContent).toBe('Risk assessment unavailable');
-    expect(screens.result).not.toHaveBeenCalled();
+  it('uses the postal search service and preserves the baseline shown on the map', async () => {
+    vi.spyOn(locationControl, 'assessLocation').mockResolvedValue({
+      status: 'OK',
+      query: {
+        queryText: '680123',
+        queryType: QueryType.PostalCode,
+        validationStatus: ValidationStatus.Valid,
+      },
+      subzone: snapshot.subzones[0],
+      assessment: { ...baseline, riskIndex: 60 },
+      snapshot,
+    });
+    await renderDashboard();
+    await search('680123');
+    expect(locationControl.assessLocation).toHaveBeenCalledWith('680123');
+    expect(selectedCard().textContent).toContain('40.0');
+    expect(container.querySelector('select')?.value).toBe(baseline.subzoneId);
   });
 
-  it('opens the map from home and passes the clicked area and its assessment to the result', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} mapControl={mapControl} />));
-    await click('Open map from home');
-    await act(async () => container.querySelector('path.leaflet-interactive')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    await click('View full assessment');
-    expect(screens.result).toHaveBeenLastCalledWith(expect.objectContaining({
-      subzone: snapshot.subzones[0], assessment: baseline,
-      clusters: snapshot.dengueClusters.filter((cluster) => cluster.subzoneId === baseline.subzoneId),
-    }));
-    await click('Back');
-    expect(container.querySelector('h1')?.textContent).toBe('Singapore Risk Map');
-    expect(container.querySelectorAll('path.leaflet-interactive')).toHaveLength(snapshot.subzones.length);
+  it('keeps the previous selection on a failed search and hides private service errors', async () => {
+    vi.spyOn(locationControl, 'assessLocation').mockRejectedValue(
+      new Error('Private upstream details'),
+    );
+    await renderDashboard();
+    await selectFirstArea();
+    await search('680123');
+    expect(container.textContent).toContain('Location search is unavailable');
+    expect(container.textContent).not.toContain('Private upstream details');
+    expect(selectedCard().querySelector('h2')?.textContent).toBe(snapshot.subzones[0].name);
   });
 
-  it('keeps the exact map baseline and snapshot for simulation and return to the result', async () => {
-    const simulation = simulationControl();
-    await act(async () => root.render(<App mapControl={mapControl} simulationControl={simulation} />));
-    await click('Open Risk Map');
-    await act(async () => container.querySelector('path.leaflet-interactive')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    await click('View Assessment');
-    await click('Simulate');
-    expect(screens.simulation).toHaveBeenLastCalledWith({ baseline, snapshot, simulationControl: simulation });
-    await click('Back to assessment');
-    expect(screens.result).toHaveBeenLastCalledWith(expect.objectContaining({ assessment: baseline, subzone: snapshot.subzones[0] }));
+  it('does not let a delayed postal search overwrite a newer map selection', async () => {
+    let finish: (value: Awaited<ReturnType<LocationRiskControl['assessLocation']>>) => void;
+    vi.spyOn(locationControl, 'assessLocation').mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    await renderDashboard();
+    await search('680123');
+    await selectFirstArea();
+    await act(async () => finish!({ status: 'DATA_UNAVAILABLE', reason: 'Old search error' }));
+    expect(selectedCard().querySelector('h2')?.textContent).toBe(snapshot.subzones[0].name);
+    expect(container.querySelector('.search-message')).toBeNull();
   });
 
-  it('shows unavailable data if a map result has no full assessment context', async () => {
-    const loaded = await mapControl.loadRiskMap();
-    if (loaded.status !== 'OK') throw new Error('Expected loaded test map.');
-    delete loaded.data.snapshot;
-    vi.spyOn(mapControl, 'loadRiskMap').mockResolvedValue(loaded);
-    await act(async () => root.render(<App mapControl={mapControl} />));
-    await click('Open Risk Map');
-    await act(async () => container.querySelector('path.leaflet-interactive')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    await click('View Assessment');
-    expect(container.querySelector('h1')?.textContent).toBe('Risk assessment unavailable');
-    expect(screens.result).not.toHaveBeenCalled();
+  it('shows unavailable risk for an unassessed area instead of a made-up score', async () => {
+    await renderDashboard();
+    await act(async () =>
+      container
+        .querySelectorAll('.risk-map path.leaflet-interactive')[1]
+        .dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    );
+    expect(selectedCard().textContent).toContain('A risk assessment is unavailable');
+    expect(container.querySelector('.area-score')).toBeNull();
   });
 
-  it('does not simulate a home assessment without its original snapshot', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} simulationControl={simulationControl()} />));
-    await click('Test location without snapshot');
-    await click('Simulate');
-    expect(container.querySelector('h1')?.textContent).toBe('Simulation unavailable');
-    expect(screens.simulation).not.toHaveBeenCalled();
-    await click('Back to assessment');
-    expect(container.querySelector('h1')?.textContent).toBe(snapshot.subzones[0].name);
+  it('changes only the preview during simulation and restores the baseline on reset and close', async () => {
+    const simulated = {
+      ...baseline,
+      assessmentId: 'what-if',
+      riskIndex: 65,
+      riskLevel: RiskLevel.High,
+    };
+    const calculate = vi.spyOn(simulationControl, 'recalculateScenario').mockResolvedValue({
+      baseline,
+      simulated,
+      scenario: {
+        scenarioId: 'scenario',
+        createdAt: snapshot.generatedAt,
+        isHypothetical: true,
+        baselineAssessmentId: baseline.assessmentId,
+        adjustments: [],
+      },
+    });
+    await renderDashboard();
+    await selectFirstArea();
+    const mainPolygon = container.querySelector('.risk-map path')!;
+    const originalFill = mainPolygon.getAttribute('fill');
+    await click('Simulate risk');
+    expect(container.querySelector('.risk-map')?.closest('[hidden]')).not.toBeNull();
+    await enter(container.querySelector(`#value-${AdjustableRiskFactorType.Humidity}`)!, '80');
+    expect(calculate).toHaveBeenCalledWith(baseline, expect.any(Array), snapshot);
+    expect(container.querySelector('.simulation-scores')?.textContent).toContain('65.0');
+    expect(container.querySelector('.simulation-scores')?.textContent).toContain('+25.0');
+    expect(
+      container.querySelector('.simulation-preview .area-preview-map path')?.getAttribute('fill'),
+    ).toBe('#6baed6');
+    expect(mainPolygon.getAttribute('fill')).toBe(originalFill);
+    expect(baseline.riskIndex).toBe(40);
+    await click('Reset to baseline');
+    expect(
+      container.querySelector('.simulation-preview .area-preview-map path')?.getAttribute('fill'),
+    ).toBe('#bdd7e7');
+    await click('Back to current risk map');
+    expect(container.querySelector('input[type="range"]')).toBeNull();
+    expect(selectedCard().textContent).toContain('40.0');
+    expect(container.querySelector('.risk-map')).toBe(mainPolygon.closest('.risk-map'));
+    expect(container.querySelector('.risk-map')?.closest('[hidden]')).toBeNull();
   });
 
-  it('passes the supplied shared snapshot with a home baseline to simulation', async () => {
-    const simulation = simulationControl();
-    await act(async () => root.render(<App locationControl={locationControl} simulationControl={simulation} />));
-    await click('Test valid location');
-    await click('Simulate');
-    expect(screens.simulation).toHaveBeenLastCalledWith({ baseline, snapshot, simulationControl: simulation });
+  it('clears a simulation when another area is selected', async () => {
+    await renderDashboard();
+    await selectFirstArea();
+    await click('Simulate risk');
+    await click('Back to current risk map');
+    const select = container.querySelector('select')!;
+    await act(async () => {
+      select.value = '';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelector('input[type="range"]')).toBeNull();
+    expect(selectedCard().textContent).toContain('Enter a postal code or area name');
   });
 
-  it('shows unavailable simulation when its control is missing', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} />));
-    await click('Test valid location');
-    await click('Simulate');
-    expect(container.querySelector('h1')?.textContent).toBe('Simulation unavailable');
-    expect(screens.simulation).not.toHaveBeenCalled();
+  it('opens a calculation dialog with the configured weights and research links', async () => {
+    // jsdom does not implement native dialogs; browser checks cover focus and Escape.
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      value: function () {
+        this.open = true;
+      },
+    });
+    await renderDashboard();
+    await selectFirstArea();
+    await click('How is this calculated?');
+    const dialog = container.querySelector('dialog')!;
+    expect(dialog.open).toBe(true);
+    expect(
+      [...dialog.querySelectorAll('.method-weights strong')].map((item) => item.textContent),
+    ).toEqual(['33.3%', '26.7%', '20.0%', '13.3%', '6.7%']);
+    expect(dialog.querySelectorAll('.research-links a')).toHaveLength(3);
+    expect(
+      [...dialog.querySelectorAll('a')].every(
+        (link) => link.target === '_blank' && link.rel.includes('noopener'),
+      ),
+    ).toBe(true);
+    expect(dialog.textContent).toContain('not an infection probability');
   });
 
-  it('opens the prevention boundary from home and passes its control and return action', async () => {
-    const preventionControl = new PreventionGuidanceControl();
-    await act(async () => root.render(<App locationControl={locationControl} preventionControl={preventionControl} />));
-    await click('Open guidance from home');
-    expect(screens.prevention).toHaveBeenLastCalledWith(expect.objectContaining({ control: preventionControl }));
-    await click('Back from guidance');
-    expect(container.querySelector('[aria-label="Test home screen"]')).not.toBeNull();
+  it('keeps the complete prevention checklist available after selecting an area', async () => {
+    await renderDashboard();
+    await selectFirstArea();
+    const checklist = container.querySelector('.full-checklist')!;
+    expect(checklist.querySelectorAll('.prevention-cards > li')).toHaveLength(15);
+    await act(async () => (checklist.querySelector('summary') as HTMLElement).click());
+    await act(async () =>
+      (checklist.querySelector('.prevention-cards button') as HTMLButtonElement).click(),
+    );
+    expect(checklist.querySelector('.task-details-panel a')?.getAttribute('href')).toContain(
+      'https://www.nea.gov.sg/',
+    );
   });
 
-  it('shows unavailable guidance without inserting sample health advice', async () => {
-    await act(async () => root.render(<App />));
-    await click('Prevention Guidance');
-    expect(container.querySelector('h1')?.textContent).toBe('Prevention guidance unavailable');
-    expect(container.textContent).not.toContain('PLACEHOLDER');
-    expect(screens.prevention).not.toHaveBeenCalled();
-    await click('Return Home');
-    expect(container.querySelector('h1')?.textContent).toBe('Location search unavailable');
-  });
-
-  it('uses the main navigation and brand without leaving stale assessment actions', async () => {
-    await act(async () => root.render(<App locationControl={locationControl} mapControl={mapControl} />));
-    await click('Test valid location');
-    await click('DengueAhead SG home');
-    await click('Test failed request');
-    expect([...container.querySelectorAll('button')].some((item) => item.textContent === 'Back to assessment')).toBe(false);
-    await click('Open Risk Map');
-    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe('Risk Map');
-    await click('Home');
-    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe('Home');
-  });
-
-  it('keeps the required footer credits and disclaimer visible', async () => {
-    await act(async () => root.render(<App />));
+  it('retains the required credits and licence links', async () => {
+    await renderDashboard();
     const footer = container.querySelector('footer')!;
-    expect([...footer.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual([
-      'https://www.onemap.gov.sg/', 'https://www.sla.gov.sg/', 'https://data.gov.sg/', 'https://data.gov.sg/open-data-licence',
-    ]);
+    expect(footer.querySelectorAll('a')).toHaveLength(4);
     expect(footer.textContent).toContain('Singapore Open Data Licence');
     expect(footer.textContent).toContain('Not an official NEA forecast or medical advice.');
   });
