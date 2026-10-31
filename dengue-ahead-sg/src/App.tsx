@@ -20,6 +20,7 @@ import type { PlanningSubzone } from './entity/PlanningSubzone.ts';
 import type { RiskAssessment } from './entity/RiskAssessment.ts';
 import type { DengueCluster } from './entity/DengueCluster.ts';
 import type { PublicDataSnapshot } from './services/ApprovedPublicDataServiceBoundary.ts';
+import { clustersForSubzone } from './control/clustersForSubzone.ts';
 
 export type Screen = 'home' | 'map' | 'result' | 'simulation' | 'prevention' | 'dataUnavailable';
 
@@ -144,12 +145,7 @@ export default function App(props: AppProps = {}) {
 
         let clusters: DengueCluster[] | undefined;
         if (snapshot) {
-          clusters = [];
-          for (const cluster of snapshot.dengueClusters) {
-            if (cluster.subzoneId === subzone.subzoneId) {
-              clusters.push(cluster);
-            }
-          }
+          clusters = clustersForSubzone(snapshot.dengueClusters, subzone);
         }
 
         return (
