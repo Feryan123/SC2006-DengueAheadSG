@@ -121,6 +121,33 @@ describe('Storage and failure handling', () => {
     expect(result.datasets.rainfall.status).toBe(DatasetStatus.Stale);
   });
 
+  it('refetches when the cached snapshot itself is over an hour old, even if saved recently', async () => {
+    snapshot.generatedAt = new Date(Date.now() - CACHE_TTL_MS).toISOString();
+    saveCache(60_000);
+    const updated = { ...snapshot, generatedAt: new Date().toISOString() };
+    const service = { retrievePublicData: vi.fn().mockResolvedValue(updated) };
+    const result = await new CachedPublicDataServiceProxy(service, snapshot).retrievePublicData();
+    expect(service.retrievePublicData).toHaveBeenCalledOnce();
+    expect(result).toBe(updated);
+    expect(JSON.parse(savedValues.get(PUBLIC_DATA_CACHE_KEY)!).snapshot).toEqual(updated);
+  });
+
+  it('keeps reusing a recent cache whose snapshot is just under an hour old', async () => {
+    snapshot.generatedAt = new Date(Date.now() - CACHE_TTL_MS + 1).toISOString();
+    saveCache(60_000);
+    const service = failedService();
+    expect(await new CachedPublicDataServiceProxy(service, snapshot).retrievePublicData()).toEqual(snapshot);
+    expect(service.retrievePublicData).not.toHaveBeenCalled();
+  });
+
+  it('still falls back to an old snapshot from the cache when the refetch fails', async () => {
+    snapshot.generatedAt = new Date(Date.now() - 3 * CACHE_TTL_MS).toISOString();
+    saveCache(60_000);
+    const result = await new CachedPublicDataServiceProxy(failedService(), null).retrievePublicData();
+    expect(result.generatedAt).toBe(snapshot.generatedAt);
+    expect(result.datasets.dengueClusters.status).toBe(DatasetStatus.Stale);
+  });
+
   it('does not treat a future cache timestamp as a fresh cache', async () => {
     saveCache(-1);
     const service = { retrievePublicData: vi.fn().mockResolvedValue(snapshot) };

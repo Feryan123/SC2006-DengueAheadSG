@@ -1,4 +1,6 @@
 // - Reuse saved public data for one hour before requesting an update.
+// - Stop reusing it once the snapshot itself is over an hour old, so a copy saved
+//   while the hourly sync was late is replaced as soon as newer data is published.
 // - If the update fails, use the last good cache, then the bundled backup.
 // - Mark bundled backup data so the screens can show a warning (Ticket #58).
 // - Ticket 13: Proxy for ApprovedPublicDataServiceBoundary; no risk calculations.
@@ -23,7 +25,7 @@ export class CachedPublicDataServiceProxy implements ApprovedPublicDataServiceBo
 
   async retrievePublicData(): Promise<PublicDataSnapshot> {
     const cached = this.readCache();
-    if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.snapshot;
+    if (cached && this.isReusable(cached)) return cached.snapshot;
 
     try {
       const snapshot = await this.service.retrievePublicData();
@@ -43,6 +45,12 @@ export class CachedPublicDataServiceProxy implements ApprovedPublicDataServiceBo
       }
       throw new Error('Public data and its backup are unavailable. Please try again later.');
     }
+  }
+
+  private isReusable(entry: CacheEntry): boolean {
+    const now = Date.now();
+    const generatedAt = Date.parse(entry.snapshot.generatedAt);
+    return now - entry.savedAt < CACHE_TTL_MS && now - generatedAt < CACHE_TTL_MS;
   }
 
   private readCache(): CacheEntry | null {
