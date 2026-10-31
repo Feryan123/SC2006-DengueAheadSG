@@ -201,9 +201,10 @@ export default function App(props: AppProps = {}) {
     }
   }
 
-  const homeActive = screen !== 'map' && screen !== 'prevention';
-  const mapActive = screen === 'map';
+  const openedFromMap = (screen === 'result' || screen === 'simulation') && resultOrigin === 'map';
+  const mapActive = screen === 'map' || openedFromMap;
   const preventionActive = screen === 'prevention';
+  const homeActive = !mapActive && !preventionActive;
 
   return (
     <div className="app-shell">

@@ -255,3 +255,37 @@ describe('App navigation (ticket 19)', () => {
     expect(footer.textContent).toContain('Not an official NEA forecast or medical advice.');
   });
 });
+
+describe('Navigation highlight (bug #60)', () => {
+  const activeNav = () => container.querySelector('[aria-current="page"]')?.textContent;
+
+  async function selectFirstMapArea() {
+    await act(async () => container.querySelector('path.leaflet-interactive')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  }
+
+  it('highlights Risk Map, not Home, for a result opened from the map', async () => {
+    await act(async () => root.render(<App locationControl={locationControl} mapControl={mapControl} />));
+    await click('Open map from home');
+    await selectFirstMapArea();
+    await click('View full assessment');
+    expect(container.querySelector('[aria-label="Test result screen"]')).not.toBeNull();
+    expect(activeNav()).toBe('Risk Map');
+  });
+
+  it('keeps Home highlighted for a result opened from the home search', async () => {
+    await act(async () => root.render(<App locationControl={locationControl} mapControl={mapControl} />));
+    await click('Test valid location');
+    expect(container.querySelector('[aria-label="Test result screen"]')).not.toBeNull();
+    expect(activeNav()).toBe('Home');
+  });
+
+  it('keeps Risk Map highlighted on the simulation opened from a map result', async () => {
+    await act(async () => root.render(<App mapControl={mapControl} simulationControl={simulationControl()} />));
+    await click('Open Risk Map');
+    await selectFirstMapArea();
+    await click('View Assessment');
+    await click('Simulate');
+    expect(container.querySelector('h1')?.textContent).toBe('Test simulation screen');
+    expect(activeNav()).toBe('Risk Map');
+  });
+});
