@@ -1,6 +1,11 @@
 
  // @vitest-environment jsdom
- // Ticket #59: Stop Leaflet animations before unmounting the risk map.
+// Ticket #59: Verify Leaflet cleanup when leaving the risk map.
+// jsdom does not reproduce Leaflet's real CSS zoom transition or its
+// delayed 250 ms callback. This is a cleanup regression test, not proof
+// that the browser-only _leaflet_pos error is fixed.
+// The actual fix must also be verified manually in a real browser by
+// repeatedly navigating away while an animated zoom is in progress.
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
@@ -53,10 +58,26 @@ afterEach(async () => {
 });
 
 describe('Ticket #59: Leaflet animation cleanup', () => {
-  it('stops map animation before removing the map during navigation', async () => {
+  it('clears the zoom animation flag before removing the map during navigation', async () => {
+    // Save the real remove() method before installing the spy.
+    // The original method must still run to release Leaflet's resources.
+    const originalRemove = L.Map.prototype.remove;
+
     const stopSpy = vi.spyOn(L.Map.prototype, 'stop');
     const removeSpy = vi.spyOn(L.Map.prototype, 'remove');
     const zoomSpy = vi.spyOn(L.Map.prototype, 'zoomIn');
+
+    let zoomFlagWhenRemoved: boolean | undefined;
+
+    removeSpy.mockImplementation(function (this: L.Map) {
+      // Inspect the flag at the moment remove() is called.
+      zoomFlagWhenRemoved = (
+        this as L.Map & { _animatingZoom?: boolean }
+      )._animatingZoom;
+
+      // Preserve Leaflet's actual map cleanup.
+      return originalRemove.call(this);
+    });
 
     const control = new RiskMapControl(new MockPublicDataService());
 
@@ -94,7 +115,13 @@ describe('Ticket #59: Leaflet animation cleanup', () => {
     const stopOrder = stopSpy.mock.invocationCallOrder.at(-1)!;
     const removeOrder = removeSpy.mock.invocationCallOrder.at(-1)!;
 
+    // stop() must happen before remove().
     expect(stopOrder).toBeLessThan(removeOrder);
+
+    // The delayed zoom callback must see this flag as false.
+    expect(zoomFlagWhenRemoved).toBe(false);
+
+    // Leaflet's map container should no longer be present.
     expect(container.querySelector('.leaflet-container')).toBeNull();
   });
 });
