@@ -58,14 +58,14 @@ describe('PreventionGuidanceBoundary (ticket 31)', () => {
   it('lists every task from the checklist, with no placeholder text', async () => {
     await show();
     expect(taskButtons().map((b) => b.textContent)).toEqual([
-      '✓ Do the Mozzie Wipeout every week',
-      '✓ Cover rarely used gully traps',
+      'Do the Mozzie Wipeout every week',
+      'Cover rarely used gully traps',
     ]);
     expect(container.textContent).not.toContain('Select Task');
     expect(container.textContent).not.toContain('PLACEHOLDER');
   });
 
-  it('hides the decorative check marks from assistive technology', async () => {
+  it('hides the decorative icons from assistive technology', async () => {
     await show();
     const icons = container.querySelectorAll('li > button > span[aria-hidden="true"]');
     expect(icons).toHaveLength(2);
@@ -146,7 +146,7 @@ describe('PreventionGuidanceBoundary (ticket 31)', () => {
   });
 
   it('uses the bundled NEA checklist when no control is passed', async () => {
-    await act(async () => root.render(<PreventionGuidanceBoundary />));
+    await act(async () => root.render(<PreventionGuidanceBoundary showAllInitially />));
     expect(taskButtons()).toHaveLength(BUNDLED_PREVENTION_TASKS.length);
   });
 });

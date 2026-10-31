@@ -1,10 +1,11 @@
-
 /**
  * Traces to: RiskSimulationControl (<<control>>) in class diagram
  * Related use case(s): UC-4 Simulate Risk Scenario
  *
  * Simulation uses a copy of the public data snapshot and reuses
  * RiskAssessmentControl.generateAssessment() for risk calculation.
+ * Exact values are also supported: humidity 0–100%, rainfall >= 0 mm,
+ * and High-Aedes overlap as a ratio from 0–1. Existing presets still work.
  *
  * Adjustment rule (one step = one AdjustmentLevel away from NO_CHANGE; up to 2 steps each way;
  * step sizes in SIMULATION_STEP_SD, reasons in riskModelConfig.ts and the risk model spec, Ticket 42):
@@ -13,11 +14,7 @@
  * - High-Aedes overlap: 1 SD of the overlap across all subzones per step, kept within 0-100%.
  */
 
-import {
-  AdjustableRiskFactorType,
-  AdjustmentLevel,
-  AssessmentType,
-} from '../entity/enums.ts';
+import { AdjustableRiskFactorType, AdjustmentLevel, AssessmentType } from '../entity/enums.ts';
 import type { RiskAssessment } from '../entity/RiskAssessment.ts';
 import type { ScenarioAdjustment } from '../entity/ScenarioAdjustment.ts';
 import type { SimulationScenario } from '../entity/SimulationScenario.ts';
@@ -47,23 +44,27 @@ export class RiskSimulationControl {
     this.riskAssessmentControl = riskAssessmentControl;
   }
 
-  async validateAdjustment(
-    adjustment: ScenarioAdjustment,
-  ): Promise<boolean> {
+  async validateAdjustment(adjustment: ScenarioAdjustment): Promise<boolean> {
     if (!adjustment || typeof adjustment !== 'object') {
       return false;
     }
 
-    const validFactors: string[] = Object.values(
-      AdjustableRiskFactorType,
-    );
+    const validFactors: string[] = Object.values(AdjustableRiskFactorType);
 
     const validLevels: string[] = Object.values(AdjustmentLevel);
 
-    return (
-      validFactors.includes(adjustment.factorType) &&
-      validLevels.includes(adjustment.adjustmentLevel)
-    );
+    if (!validFactors.includes(adjustment.factorType)) return false;
+
+    if (adjustment.value !== undefined) {
+      const value = adjustment.value;
+      if (adjustment.adjustmentLevel !== undefined || !Number.isFinite(value) || value < 0)
+        return false;
+      if (adjustment.factorType === AdjustableRiskFactorType.Humidity) return value <= 100;
+      if (adjustment.factorType === AdjustableRiskFactorType.HighAedesArea) return value <= 1;
+      return true;
+    }
+
+    return validLevels.includes(adjustment.adjustmentLevel ?? '');
   }
 
   async recalculateScenario(
@@ -120,12 +121,14 @@ export class RiskSimulationControl {
     }
 
     for (const adjustment of adjustments) {
-      const value = this.adjustedValue(
-        snapshot,
-        baseline.subzoneId,
-        adjustment.factorType,
-        adjustment.adjustmentLevel,
-      );
+      const value =
+        adjustment.value ??
+        this.adjustedValue(
+          snapshot,
+          baseline.subzoneId,
+          adjustment.factorType,
+          adjustment.adjustmentLevel ?? AdjustmentLevel.NoChange,
+        );
 
       switch (adjustment.factorType) {
         case AdjustableRiskFactorType.Humidity:
@@ -143,17 +146,14 @@ export class RiskSimulationControl {
     }
 
     // Reuse the existing calculators, weighting, risk index and bands.
-    const simulated =
-      await this.riskAssessmentControl.generateAssessment(
-        baseline.subzoneId,
-        simulatedSnapshot,
-        { assessmentType: AssessmentType.Simulated },
-      );
+    const simulated = await this.riskAssessmentControl.generateAssessment(
+      baseline.subzoneId,
+      simulatedSnapshot,
+      { assessmentType: AssessmentType.Simulated },
+    );
 
     if (simulated === null) {
-      throw new Error(
-        'Simulated risk assessment could not be generated',
-      );
+      throw new Error('Simulated risk assessment could not be generated');
     }
 
     const scenario: SimulationScenario = {
@@ -174,13 +174,9 @@ export class RiskSimulationControl {
     };
   }
 
-  async resetScenario(
-    scenario: SimulationScenario,
-  ): Promise<SimulationScenario> {
-    const {
-      simulatedAssessmentId: _discardedSimulatedAssessmentId,
-      ...remainingScenario
-    } = scenario;
+  async resetScenario(scenario: SimulationScenario): Promise<SimulationScenario> {
+    const { simulatedAssessmentId: _discardedSimulatedAssessmentId, ...remainingScenario } =
+      scenario;
 
     return {
       ...remainingScenario,
@@ -205,8 +201,7 @@ export class RiskSimulationControl {
     switch (factorType) {
       case AdjustableRiskFactorType.Humidity:
         return this.clamp(
-          weather.meanHumidityPct +
-            step * SIMULATION_STEP_SD.humidity * weather.humidityNormalSd,
+          weather.meanHumidityPct + step * SIMULATION_STEP_SD.humidity * weather.humidityNormalSd,
           0,
           100,
         );
@@ -214,22 +209,17 @@ export class RiskSimulationControl {
       case AdjustableRiskFactorType.LaggedRainfall:
         return Math.max(
           0,
-          weather.rainfallMm +
-            step * SIMULATION_STEP_SD.rainfall * weather.rainfallNormalSd,
+          weather.rainfallMm + step * SIMULATION_STEP_SD.rainfall * weather.rainfallNormalSd,
         );
 
       case AdjustableRiskFactorType.HighAedesArea: {
         const ratio =
-          snapshot.subzones.find((subzone) => subzone.subzoneId === subzoneId)
-            ?.aedesOverlapRatio ?? 0;
+          snapshot.subzones.find((subzone) => subzone.subzoneId === subzoneId)?.aedesOverlapRatio ??
+          0;
         const spread = this.standardDeviation(
           snapshot.subzones.map((subzone) => subzone.aedesOverlapRatio),
         );
-        return this.clamp(
-          ratio + step * SIMULATION_STEP_SD.aedesOverlap * spread,
-          0,
-          1,
-        );
+        return this.clamp(ratio + step * SIMULATION_STEP_SD.aedesOverlap * spread, 0, 1);
       }
     }
   }
@@ -244,11 +234,7 @@ export class RiskSimulationControl {
     return Math.sqrt(squares / (valid.length - 1));
   }
 
-  private clamp(
-    value: number,
-    minimum: number,
-    maximum: number,
-  ): number {
+  private clamp(value: number, minimum: number, maximum: number): number {
     return Math.min(maximum, Math.max(minimum, value));
   }
 }

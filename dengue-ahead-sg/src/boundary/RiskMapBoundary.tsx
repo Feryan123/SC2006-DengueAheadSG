@@ -1,16 +1,17 @@
-
-// - Show subzone colours, selected-area details and the top 10 assessed areas.
+// - Show the dashboard map, combined search and highest-risk areas.
+// - Select an area directly, without a floating popup covering the map.
 // - Use Leaflet for the map and RiskMapControl for its data (UC-2).
 // - Show a warning when the map uses saved backup data (Ticket #58).
 // - Show the base-map warning only after its images fail to load (Ticket #57).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
-import { createSubzonePopup } from './SubzonePopup.ts';
 import BundledFallbackNotice from './BundledFallbackNotice.tsx';
 import DataFreshnessNotice from './DataFreshnessNotice.tsx';
+import type { LocationRiskControl } from '../control/LocationRiskControl.ts';
+import { ValidationStatus } from '../entity/enums.ts';
 import {
   RiskMapControl,
   type MapResult,
@@ -24,13 +25,25 @@ const defaultControl = new RiskMapControl();
 type Props = {
   onRequestAssessment: (subzoneId: string, selection?: MapAssessmentSelection) => void;
   control?: RiskMapControl;
+  locationControl?: LocationRiskControl;
+  children?: ReactNode;
+  simulation?: ReactNode;
 };
 
-export default function RiskMapBoundary({ onRequestAssessment, control = defaultControl }: Props) {
+export default function RiskMapBoundary({
+  onRequestAssessment,
+  control = defaultControl,
+  locationControl,
+  children,
+  simulation,
+}: Props) {
   const [result, setResult] = useState<MapResult | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
   const [searchMessage, setSearchMessage] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [showAllRanks, setShowAllRanks] = useState(false);
+  const searchRequest = useRef(0);
   const [mapError, setMapError] = useState('');
   const [tilesUnavailable, setTilesUnavailable] = useState(false);
   const mapElement = useRef<HTMLDivElement>(null);
@@ -61,20 +74,23 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
 
     return () => {
       cancelled = true;
+      searchRequest.current += 1;
     };
   }, [control]);
 
   const data = result?.status === 'OK' ? result.data : null;
-  const selectedZone = data?.subzones.find((zone) => zone.subzoneId === selectedId);
-  const selectedStyle = getRiskLevelStyle(data?.riskLevels[selectedId]);
   const unavailableStyle = getRiskLevelStyle();
   const topSubzones = data ? control.getTopSubzones(data) : [];
+  const simulationVisible = Boolean(simulation);
 
   useEffect(() => {
     if (!mapElement.current) return;
 
     const leafletMap = L.map(mapElement.current, {
-      maxBounds: [[1.144, 103.535], [1.494, 104.502]],
+      maxBounds: [
+        [1.144, 103.535],
+        [1.494, 104.502],
+      ],
     }).setView([1.35, 103.82], 11);
 
     map.current = leafletMap;
@@ -85,7 +101,8 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
     const baseTiles = L.tileLayer('https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png', {
       minZoom: 11,
       maxZoom: 19,
-      attribution: '<img src="https://www.onemap.gov.sg/web-assets/images/logo/om_logo.png" style="height:20px;width:20px;" alt=""/> <a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a> &copy; contributors | <a href="https://www.sla.gov.sg/" target="_blank" rel="noopener noreferrer">Singapore Land Authority</a>',
+      attribution:
+        '<img src="https://www.onemap.gov.sg/web-assets/images/logo/om_logo.png" style="height:20px;width:20px;" alt=""/> <a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a> &copy; contributors | <a href="https://www.sla.gov.sg/" target="_blank" rel="noopener noreferrer">Singapore Land Authority</a>',
     });
 
     let tilesFailed = false;
@@ -100,9 +117,16 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
     }
 
     const tileEvents = {
-      loading: () => { tilesFailed = false; },
-      tileerror: () => { tilesFailed = true; updateTileWarning(); },
-      tileload: () => { setTilesUnavailable(false); },
+      loading: () => {
+        tilesFailed = false;
+      },
+      tileerror: () => {
+        tilesFailed = true;
+        updateTileWarning();
+      },
+      tileload: () => {
+        setTilesUnavailable(false);
+      },
       load: updateTileWarning,
       tileunload: updateTileWarning,
     };
@@ -132,24 +156,12 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
         tooltip.textContent = `${zone.name} — ${style.label}`;
         layer.bindTooltip(tooltip);
 
-        const assessment = data?.assessments[zone.subzoneId];
-        layer.bindPopup(
-          createSubzonePopup(
-            zone,
-            assessment,
-            control.getTopFactors(assessment),
-            requestAssessment,
-          ),
-        );
-
-        layer.on('click', () => setSelectedId(zone.subzoneId));
+        layer.on('click', () => selectSubzone(zone.subzoneId));
         layer.addTo(leafletMap);
         areaLayers.current.push({ id: zone.subzoneId, layer });
       }
 
-      const bounds = L.featureGroup(
-        areaLayers.current.map((area) => area.layer),
-      ).getBounds();
+      const bounds = L.featureGroup(areaLayers.current.map((area) => area.layer)).getBounds();
 
       if (bounds.isValid()) {
         leafletMap.fitBounds(bounds, {
@@ -163,9 +175,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
       }
 
       areaLayers.current = [];
-      setMapError(
-        'Area boundaries could not be displayed. Please try again later.',
-      );
+      setMapError('Area boundaries could not be displayed. Please try again later.');
     }
 
     // Overlay layers must not intercept clicks intended for subzones.
@@ -263,6 +273,8 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
   }, [overlays, data, control]);
 
   useEffect(() => {
+    // Refresh the map size when the inline sliders open or close.
+    map.current?.invalidateSize({ pan: false });
     if (!selectedId) {
       map.current?.closePopup();
     }
@@ -283,316 +295,262 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
           padding: [30, 30],
           maxZoom: 14,
         });
-        area.layer.openPopup();
       }
     }
-  }, [selectedId, data, control]);
+  }, [selectedId, data, control, simulationVisible]);
 
-  async function selectSubzone(id: string) {
-    const zone = await control.selectSubzone(id, data?.subzones ?? []);
+  function selectSubzone(id: string) {
+    searchRequest.current += 1;
+    setSearching(false);
+    setSearchMessage('');
+    const zone = data?.subzones.find((item) => item.subzoneId === id);
     setSelectedId(zone?.subzoneId ?? '');
-
-    if (zone?.subzoneId === selectedId) {
-      areaLayers.current
-        .find((area) => area.id === selectedId)
-        ?.layer.openPopup();
-    }
+    const selection = zone && data ? control.getSelectedAssessment(zone.subzoneId, data) : null;
+    assessmentAction.current(zone?.subzoneId ?? '', selection ?? undefined);
   }
 
-  function searchSubzone() {
-    const query = search.trim().toLowerCase();
-
-    const match = query
-      ? data?.subzones.find((zone) =>
-          zone.name.toLowerCase().includes(query))
-      : undefined;
-
-    void selectSubzone(match?.subzoneId ?? '');
-    setSearchMessage(match ? '' : 'No matching area. Try a subzone name.');
+  async function searchSubzone() {
+    if (searching) return;
+    const query = search.trim();
+    if (!query) {
+      setSearchMessage('Enter a subzone name, address or 6-digit Singapore postal code.');
+      return;
+    }
+    const matches =
+      data?.subzones.filter((zone) => zone.name.toLowerCase().includes(query.toLowerCase())) ?? [];
+    const exact = matches.find((zone) => zone.name.toLowerCase() === query.toLowerCase());
+    if (exact || matches.length === 1) {
+      selectSubzone((exact ?? matches[0]).subzoneId);
+      return;
+    }
+    if (matches.length > 1) {
+      setSearchMessage(
+        'Several areas match. Choose a full subzone name from the suggestions or area list.',
+      );
+      return;
+    }
+    if (!locationControl) {
+      setSearchMessage(
+        'No matching area. Postal-code and address search are unavailable right now. Try a subzone name.',
+      );
+      return;
+    }
+    const request = ++searchRequest.current;
+    setSearching(true);
+    setSearchMessage('');
+    try {
+      const found = await locationControl.assessLocation(query);
+      if (request !== searchRequest.current) return;
+      if (found.status === 'OK') {
+        // Keep the result consistent with the assessment already drawn on the main map.
+        const mapped = data ? control.getSelectedAssessment(found.subzone.subzoneId, data) : null;
+        setSelectedId(found.subzone.subzoneId);
+        assessmentAction.current(found.subzone.subzoneId, mapped ?? found);
+      } else if (found.status === 'INVALID_LOCATION') {
+        setSearchMessage(
+          found.query.validationStatus === ValidationStatus.OutsideSingapore
+            ? 'Choose a location in Singapore.'
+            : 'No matching location. Check the postal code, address or subzone name.',
+        );
+      } else {
+        setSearchMessage(
+          'Location search is unavailable right now. You can still select an area on the map.',
+        );
+      }
+    } catch {
+      if (request === searchRequest.current)
+        setSearchMessage(
+          'Location search is unavailable right now. You can still select an area on the map.',
+        );
+    } finally {
+      if (request === searchRequest.current) setSearching(false);
+    }
   }
 
   async function toggleOverlay(name: OverlayName) {
     setOverlays(await control.updateOverlay(overlays, name));
   }
 
-  function requestAssessment(id: string) {
-    const selection = data
-      ? control.getSelectedAssessment(id, data)
-      : null;
-
-    if (data?.riskLevels[id]) {
-      assessmentAction.current(id, selection ?? undefined);
-    }
-  }
-
   return (
-    <section>
-      <div className="map-heading">
-        <div>
-          <h1>Singapore Risk Map</h1>
-          <p className="muted">
-            Select an area on the map or search its name.
-          </p>
-        </div>
-        <div className="search-row map-search">
-          <input
-            aria-label="Search Planning Subzone"
-            placeholder="Enter a subzone name"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') searchSubzone();
-            }}
-          />
-          <button
-            className="primary"
-            disabled={!data}
-            onClick={searchSubzone}
-          >
-            Search
-          </button>
-        </div>
-      </div>
-
-      {control === defaultControl && (
-        <p className="notice">
-          Official subzone outlines are shown. Grey means risk is
-          unavailable; it does not mean low risk.
-        </p>
-      )}
-
+    <section aria-label="Dengue risk dashboard">
       <BundledFallbackNotice snapshot={data?.snapshot} />
       <DataFreshnessNotice snapshot={data?.snapshot} />
-
-      {searchMessage && <p role="status">{searchMessage}</p>}
-
-      <div className="map-layout">
-        <div>
-          <div
-            ref={mapElement}
-            className="risk-map"
-            role="region"
-            aria-label="Singapore subzone risk map"
-          />
-
-          {mapError && (
-            <p role="alert" className="error-text">{mapError}</p>
-          )}
-
-          {tilesUnavailable && (
-            <p role="status">
-              The base map is unavailable. Area boundaries can still be viewed.
+      <div hidden={simulationVisible}>
+        <div className="dashboard-heading">
+          <h1>Check dengue risk in your area</h1>
+          <p className="muted">Search for an area or select it on the map.</p>
+          <form
+            className="search-row dashboard-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void searchSubzone();
+            }}
+          >
+            <input
+              type="search"
+              aria-label="Postal code, address or subzone name"
+              aria-describedby="search-help"
+              placeholder="Enter a postal code or subzone name"
+              list="subzone-suggestions"
+              maxLength={200}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <datalist id="subzone-suggestions">
+              {data?.subzones.map((zone) => (
+                <option key={zone.subzoneId} value={zone.name} />
+              ))}
+            </datalist>
+            <button className="primary" disabled={searching || (!data && !locationControl)}>
+              {searching ? 'Searching…' : 'Search area'}
+            </button>
+          </form>
+          <p className="small muted" id="search-help">
+            For example: 680123, Aljunied or a Singapore address.
+          </p>
+          {searchMessage && (
+            <p role="status" className="search-message">
+              {searchMessage}
             </p>
           )}
-
-          <div className="card map-summary">
-            <div>
-              <strong>
-                Planning Subzone: {selectedZone?.name ?? 'Not selected'}
-              </strong>
-              <p className="muted small">
-                Choose a subzone to view its assessment.
+        </div>
+        {control === defaultControl && (
+          <p className="notice">
+            Official outlines are shown. Grey means risk is unavailable; it does not mean low risk.
+          </p>
+        )}
+        <div className={`map-layout${selectedId ? ' has-selection' : ''}`}>
+          <div className="map-column">
+            <div className="card map-card">
+              <div className="map-toolbar">
+                <h2>Singapore risk map</h2>
+                <div className="map-overlays">
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      disabled={!data?.dengueClusters.length}
+                      checked={overlays.dengueClusters}
+                      onChange={() => void toggleOverlay('dengueClusters')}
+                    />
+                    <span className="overlay-dot cluster-dot" aria-hidden="true" />
+                    Confirmed clusters
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      disabled={!data?.highAedesAreas.length}
+                      checked={overlays.highAedesAreas}
+                      onChange={() => void toggleOverlay('highAedesAreas')}
+                    />
+                    <span className="overlay-dot aedes-dot" aria-hidden="true" />
+                    High Aedes count areas
+                  </label>
+                </div>
+              </div>
+              <div
+                ref={mapElement}
+                className="risk-map"
+                role="region"
+                aria-label="Singapore subzone risk map"
+              />
+              {mapError && (
+                <p role="alert" className="error-text">
+                  {mapError}
+                </p>
+              )}
+              {tilesUnavailable && (
+                <p role="status">
+                  The base map is unavailable. Area boundaries can still be viewed.
+                </p>
+              )}
+              <div className="map-legend" aria-label="Risk levels">
+                {Object.entries(riskLevelStyle).map(([level, style]) => (
+                  <span key={level}>
+                    <i style={{ backgroundColor: style.colour }} aria-hidden="true" />
+                    {style.label}
+                  </span>
+                ))}
+                <span>
+                  <i style={{ backgroundColor: unavailableStyle.colour }} aria-hidden="true" />
+                  Risk unavailable
+                </span>
+              </div>
+              <p className="muted small map-key">
+                Darker blue means higher risk. A pink outline marks your selection. The main map
+                shows current risk.
+              </p>
+              <div className="area-picker">
+                <label htmlFor="subzone">Planning Subzone</label>
+                <select
+                  id="subzone"
+                  disabled={!data}
+                  value={selectedId}
+                  onChange={(event) => selectSubzone(event.target.value)}
+                >
+                  <option value="">Choose an area</option>
+                  {data?.subzones.map((zone) => (
+                    <option key={zone.subzoneId} value={zone.subzoneId}>
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="small muted map-data-status" role="status">
+                {!result
+                  ? 'Loading area data…'
+                  : result.status !== 'OK'
+                    ? result.message
+                    : mapError ||
+                      `${data?.subzones.length ?? 0} areas · ${data?.dengueClusters.length ?? 0} dengue clusters · ${data?.highAedesAreas.length ?? 0} high-Aedes areas`}
               </p>
             </div>
-
-            <span
-              className="risk-pill"
-              style={{
-                backgroundColor: selectedStyle.colour,
-                color: selectedStyle.textColour,
-              }}
-            >
-              {selectedStyle.label}
-            </span>
-
+          </div>
+          {children}
+        </div>
+        <section className="card map-ranking" aria-label="Top 10 subzones">
+          <div className="section-title">
+            <h2>Highest-risk subzones</h2>
             <button
-              className="primary"
-              disabled={!selectedId || !data?.riskLevels[selectedId]}
-              onClick={() => requestAssessment(selectedId)}
+              className="text-button"
+              aria-expanded={showAllRanks}
+              onClick={() => setShowAllRanks(!showAllRanks)}
             >
-              View Assessment
+              {showAllRanks ? 'Show fewer' : 'View all 10'}
             </button>
           </div>
-
-          <section
-            className="card map-ranking"
-            aria-label="Top 10 subzones"
-          >
-            <h2>Top 10 subzones</h2>
-            <p className="muted small">
-              Assessed areas ranked by risk index, highest first.
-            </p>
-
-            {topSubzones.length > 0 ? (
-              <ol className="top-risk-list">
-                {topSubzones.map(({ subzone, assessment }) => (
+          <p className="muted small">Assessed areas ranked by risk index, highest first.</p>
+          {topSubzones.length ? (
+            <ol className="top-risk-list">
+              {(showAllRanks ? topSubzones : topSubzones.slice(0, 3)).map(
+                ({ subzone, assessment }, index) => (
                   <li key={subzone.subzoneId}>
                     <button
                       type="button"
                       aria-label={`Show ${subzone.name} on map`}
-                      onClick={() =>
-                        void selectSubzone(subzone.subzoneId)
-                      }
+                      style={{
+                        backgroundColor: getRiskLevelStyle(assessment.riskLevel).colour,
+                        color: getRiskLevelStyle(assessment.riskLevel).textColour,
+                      }}
+                      onClick={() => selectSubzone(subzone.subzoneId)}
                     >
-                      <span>{subzone.name}</span>
+                      <strong>
+                        {index + 1}. {subzone.name}
+                      </strong>
                       <span>
-                        {assessment.riskIndex.toFixed(1)}
-                        {' — '}
+                        {assessment.riskIndex.toFixed(1)} —{' '}
                         {getRiskLevelStyle(assessment.riskLevel).label}
                       </span>
                     </button>
                   </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="muted">
-                No assessed areas are available yet.
-              </p>
-            )}
-          </section>
-        </div>
-
-        <aside className="card map-side">
-          <h2>Legend</h2>
-
-          <div className="map-legend">
-            {Object.entries(riskLevelStyle).map(([level, style]) => (
-              <span
-                className="risk-pill"
-                style={{
-                  backgroundColor: style.colour,
-                  color: style.textColour,
-                }}
-                key={level}
-              >
-                {style.label}
-              </span>
-            ))}
-
-            <span
-              className="risk-pill"
-              style={{
-                backgroundColor: unavailableStyle.colour,
-                color: unavailableStyle.textColour,
-              }}
-            >
-              {unavailableStyle.label}
-            </span>
-          </div>
-
-          <p className="muted small">
-            Darker areas mean higher risk. Select an area to read its level.
-          </p>
-
-          <p className="muted small">
-            Purple dashed lines mark subzones. A solid bright pink
-            outline shows your selection.
-          </p>
-
-          <h3>Overlays</h3>
-
-          <label className="toggle-row">
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  display: 'inline-block',
-                  width: '14px',
-                  height: '14px',
-                  flexShrink: 0,
-                  backgroundColor: '#ef4444',
-                  border: '2px solid #dc2626',
-                  borderRadius: '3px',
-                }}
-              />
-              Confirmed clusters
-            </span>
-            <input
-              type="checkbox"
-              disabled={!data?.dengueClusters.length}
-              checked={overlays.dengueClusters}
-              onChange={() => void toggleOverlay('dengueClusters')}
-            />
-          </label>
-
-          <label className="toggle-row">
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  display: 'inline-block',
-                  width: '14px',
-                  height: '14px',
-                  flexShrink: 0,
-                  backgroundColor: '#f59e0b',
-                  border: '2px solid #d97706',
-                  borderRadius: '3px',
-                }}
-              />
-              High Aedes count areas
-            </span>
-            <input
-              type="checkbox"
-              disabled={!data?.highAedesAreas.length}
-              checked={overlays.highAedesAreas}
-              onChange={() => void toggleOverlay('highAedesAreas')}
-            />
-          </label>
-
-          <p className="muted small">
-            {!data
-              ? 'Overlay data is unavailable.'
-              : `Available overlays: ${data.dengueClusters.length} dengue clusters and ${data.highAedesAreas.length} high-Aedes areas.`}
-          </p>
-
-          <label
-            className="dropdown-label"
-            htmlFor="subzone"
-          >
-            Planning Subzone
-          </label>
-
-          <select
-            id="subzone"
-            disabled={!data}
-            value={selectedId}
-            onChange={(event) =>
-              void selectSubzone(event.target.value)
-            }
-          >
-            <option value="">Choose an area</option>
-            {data?.subzones.map((zone) => (
-              <option
-                key={zone.subzoneId}
-                value={zone.subzoneId}
-              >
-                {zone.name}
-              </option>
-            ))}
-          </select>
-
-          <h3>Data status</h3>
-          <p className="muted small" role="status">
-            {!result
-              ? 'Loading...'
-              : result.status === 'OK'
-                ? (mapError || 'Area boundaries loaded')
-                : result.message}
-          </p>
-        </aside>
+                ),
+              )}
+            </ol>
+          ) : (
+            <p className="muted">No assessed areas are available yet.</p>
+          )}
+        </section>
       </div>
+      {simulation}
     </section>
   );
 }

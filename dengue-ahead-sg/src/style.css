@@ -23,10 +23,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline: 3px solid var(--teal);
   outline-offset: 3px;
 }
+summary:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 32px; line-height: 1.2; margin-bottom: 10px; }
 h2 { font-size: 24px; }
 h3 { font-size: 18px; }
+h1, h2, h3 { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .eyebrow { font-size: 12px; font-weight: 600; }
@@ -159,3 +162,230 @@ input::placeholder { color: #8a9aa3; }
 .prevention-task:hover { background: #eef3f5; }
 .task-details-panel { border-top: 1px solid var(--border); padding: 16px 20px; font-size: 13px; line-height: 1.5; }
 .task-details-panel p:last-child { margin-bottom: 0; }
+/* One dashboard: the main map stays beside the selected area's preview. */
+.app-shell { background: #faf9f6; }
+.site-main { width: min(100%, 1480px); padding: 32px 32px 48px; }
+.header-inner { max-width: 1480px; padding: 10px 32px; justify-content: space-between; gap: 24px; }
+.brand { text-decoration: none; font-size: 24px; }
+.brand-logo { object-fit: contain; }
+.header-description { color: var(--muted); font-size: 13px; }
+.dashboard-heading { margin-bottom: 24px; }
+.dashboard-heading h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -1px; }
+.dashboard-heading > .small { margin: 8px 0 0; }
+.dashboard-search { max-width: 1040px; gap: 12px; }
+.dashboard-search input { min-height: 56px; font-size: 16px; padding: 14px 18px; border-radius: 8px; }
+.dashboard-search .primary { min-width: 172px; border-radius: 8px; font-size: 16px; }
+.search-message { margin: 12px 0 0; font-size: 14px; }
+.map-layout { grid-template-columns: minmax(0, 2.1fr) minmax(320px, 1fr); align-items: start; gap: 20px; }
+.map-column { grid-column: 1; grid-row: 1; min-width: 0; }
+.map-card { padding: 20px; background: #eaf5fc; border-color: #d1e4ef; }
+.map-toolbar, .section-title, .area-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.map-toolbar { margin-bottom: 12px; }
+.map-toolbar h2, .section-title h2, .area-title h2 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+.map-overlays { display: flex; gap: 12px; flex-wrap: wrap; }
+.map-overlays .toggle-row { justify-content: start; gap: 6px; margin: 0; min-height: 36px; font-size: 12px; }
+.map-overlays input { margin: 0; }
+.overlay-dot { width: 9px; height: 9px; border-radius: 2px; }
+.cluster-dot { background: #ef4444; }
+.aedes-dot { background: #f59e0b; }
+.risk-map { height: 470px; border-radius: 9px; }
+.map-legend { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0 8px; font-size: 12px; }
+.map-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.map-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #173b551a; flex-shrink: 0; }
+.map-key { margin-bottom: 12px; line-height: 1.5; }
+.area-picker { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.area-picker label { white-space: nowrap; }
+.area-picker select { max-width: 320px; padding: 8px 12px; }
+.map-data-status { margin: 12px 0 0; }
+.map-ranking { padding: 24px; margin: 24px 0; background: #ecebfc; border-color: #dbd8f1; }
+.map-ranking .section-title { margin-bottom: 4px; }
+.map-ranking p { margin-bottom: 8px; }
+.top-risk-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; padding: 0; }
+.top-risk-list li { padding: 0; margin: 0; }
+.top-risk-list button { display: flex; flex-direction: column; gap: 12px; padding: 20px; width: 100%; height: 100%; border-radius: 10px; border: 1px solid #173b5522; font-size: 16px; line-height: 1.4; }
+.top-risk-list button:hover { filter: brightness(0.95); }
+.top-risk-list button span { font-size: 20px; font-weight: 700; }
+
+/* The preview never pans or zooms. Only its selected polygon changes colour. */
+.area-card { grid-column: 2; grid-row: 1 / span 2; padding: 20px; min-width: 0; }
+.area-title h2 { overflow-wrap: anywhere; text-transform: capitalize; }
+.area-title + p { margin: 6px 0 14px; }
+.area-preview-map { height: 230px; background: #edf3f9; border-radius: 8px; overflow: hidden; z-index: 0; }
+.area-preview-map .leaflet-control-attribution { font-size: 9px; }
+.area-preview-map .leaflet-container { cursor: default; }
+.area-score { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 16px 0 6px; }
+.area-score strong { font-size: 48px; line-height: 1.15; letter-spacing: -2px; }
+.area-score .risk-pill { white-space: nowrap; }
+/* The selected area's risk is the sidebar's main result. */
+.area-score-hero { display: block; margin: 0; padding: 20px 16px 16px; border: 2px solid #173b55; border-radius: 14px; background: #eff3ff; text-align: center; }
+.area-score-hero h3 { font-size: 20px; margin: 0 0 12px; }
+.risk-index-number { display: flex; justify-content: center; align-items: baseline; flex-wrap: wrap; gap: 0 8px; }
+.area-score-hero .risk-index-number strong { font-size: 88px; line-height: 1; letter-spacing: -4px; font-variant-numeric: tabular-nums; }
+.risk-index-number > span { font-size: 18px; font-weight: 600; }
+.area-score-hero > .risk-pill { display: inline-block; margin: 14px 0 22px; padding: 8px 22px; border: 1px solid currentColor; font-size: 18px; text-transform: uppercase; }
+.area-score-hero .risk-scale { margin-top: 0; }
+.area-score-hero .risk-scale > span { width: 0; height: 0; top: -12px; background: none; border: 6px solid transparent; border-top-color: #173b55; border-radius: 0; }
+.area-score-hero .risk-scale-labels { font-size: 11px; margin: 8px 0 0; }
+.area-method-link { text-align: center; }
+.area-method-link .method-link { margin: 8px 0 10px; padding: 6px 0; }
+.area-card .area-preview-map { height: 190px; }
+.area-card .confidence-note { margin-top: 16px; }
+.text-button { border: 0; background: none; color: #087c79; font-size: 13px; padding: 8px 0; text-decoration: underline; text-underline-offset: 3px; }
+.method-link { padding-top: 4px; margin-bottom: 12px; }
+.risk-scale { height: 10px; border-radius: 10px; position: relative; background: linear-gradient(to right, #eff3ff 0% 25%, #bdd7e7 25% 50%, #6baed6 50% 75%, #2171b5 75% 100%); margin: 8px 7px 6px; }
+.risk-scale > span { position: absolute; top: -4px; width: 18px; height: 18px; background: #173b55; border: 2px solid white; border-radius: 50%; transform: translateX(-50%); }
+.risk-scale-labels { display: flex; justify-content: space-around; font-size: 10px; color: var(--muted); margin-bottom: 20px; }
+.confidence-note { margin-bottom: 5px; }
+.confidence-note strong { text-transform: capitalize; }
+.simulate-button { width: 100%; min-height: 48px; margin-top: 8px; }
+.data-time { margin: 14px 0 0; line-height: 1.5; }
+.empty-area { text-align: center; }
+.empty-area h2 { text-align: left; }
+.location-symbol { display: block; font-size: 80px; color: #8caabe; margin: 22px 0 12px; }
+
+/* Simulation has one map, with the controls and comparison beside it. */
+.simulation-section { padding: 28px; background: #ecebfc; border: 1px solid #dbd8f1; border-radius: 16px; }
+.simulation-section h1 { font-size: 36px; margin: 0; }
+.simulation-section > p { margin: 12px 0 24px; line-height: 1.5; }
+.simulation-scores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+.simulation-scores > div { background: #fff; border-radius: 12px; padding: 20px; }
+.simulation-scores h2 { font-size: 20px; margin-bottom: 12px; }
+.simulation-scores strong { display: inline-block; font-size: 38px; margin-right: 12px; }
+.simulation-scores small, .simulation-preview .area-score small { font-size: 15px; font-weight: 400; letter-spacing: 0; }
+.simulation-workspace { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }
+.simulation-inputs, .simulation-preview { padding: 24px; min-width: 0; box-shadow: none; }
+.simulation-workspace h2 { font-size: 28px; margin-bottom: 20px; }
+.simulation-preview { position: sticky; top: 16px; }
+.simulation-preview .area-preview-map { height: 370px; }
+.simulation-preview .area-score { justify-content: center; gap: 16px; }
+.simulation-map-wrap { position: relative; }
+.simulation-map-placeholder { position: absolute; inset: 0; min-height: 370px; display: grid; place-items: center; background: #f5f4fc; border-radius: 10px; padding: 20px; text-align: center; z-index: 1; }
+.simulation-mobile-feedback { display: none; }
+.sim-factor { border: 0; border-bottom: 1px solid var(--border); padding: 0 0 20px; margin: 20px 0; }
+.sim-input-title h3 { font-size: 20px; margin: 0 0 4px; }
+.sim-input-row { display: grid; grid-template-columns: minmax(0, 1fr) 130px; align-items: center; gap: 20px; margin-top: 12px; }
+.sim-factor input[type='range'] { padding: 0; min-height: 44px; border: 0; }
+.sim-range-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+.sim-number-field label { font-size: 12px; min-height: 0; margin: 0 0 6px; }
+.number-with-unit { display: flex; align-items: stretch; border: 1px solid #b4c4cb; border-radius: 7px; overflow: hidden; }
+.number-with-unit input[type='number'] { border: 0; border-radius: 0; font-size: 16px; padding: 10px; }
+.number-with-unit > span { display: grid; place-items: center; background: #eef1f6; padding: 0 10px; font-size: 13px; }
+.number-with-unit:focus-within { outline: 3px solid var(--teal); outline-offset: 3px; }
+.number-with-unit input:focus-visible { outline: 0; }
+.sim-factor > .small { margin: 10px 0 0; line-height: 1.5; }
+.simulation-section .simulation-note { font-size: 13px; text-align: center; margin: 24px 0 0; }
+
+/* Keep the main facts visual, with the full explanations available on demand. */
+.risk-factors, .prevention-panel { padding: 24px; margin: 24px 0; }
+.risk-factors { background: #fff5df; border-color: #efdfba; }
+.risk-factors h2, .prevention-panel h2 { font-size: 28px; margin-bottom: 16px; }
+.area-recommendations { background: #e9f6ef; border-color: #cce5d6; }
+.area-recommendations h2 { color: #174e3b; }
+.prevention-guidance-boundary, .full-checklist { background: #fff0df; border-color: #f0d7bb; }
+.prevention-guidance-boundary h2, .full-checklist > summary { color: #793824; }
+.section-description { color: var(--muted); margin: 8px 0 12px; line-height: 1.6; }
+.factor-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; list-style: none; padding: 0; margin: 0; }
+.factor-grid li { border: 1px solid #e6dcc7; border-radius: 10px; padding: 18px; font-size: 14px; background: #fffefa; }
+.factor-grid .dashboard-icon { margin-bottom: 14px; }
+.factor-grid li > strong { display: block; min-height: 36px; }
+.factor-value { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.factor-track, .method-track { height: 8px; background: #e7eef5; border-radius: 6px; overflow: hidden; }
+.factor-track > span, .method-track > span { display: block; height: 100%; border-radius: inherit; background: #2171b5; }
+.factor-grid details { margin-top: 14px; font-size: 12px; line-height: 1.6; }
+summary { cursor: pointer; color: #087c79; }
+details > p { margin: 12px 0; }
+.cluster-status { padding: 24px; font-size: 14px; background: #f0f1f8; border-radius: 14px; }
+.cluster-status h2 { font-size: 28px; margin-bottom: 10px; }
+.prevention-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 0; list-style: none; }
+.prevention-cards li { padding: 20px; border: 1px solid #173b551a; border-radius: 10px; font-size: 14px; line-height: 1.6; background: #fffefa; }
+.prevention-cards summary { list-style: none; display: grid; grid-template-columns: 60px 1fr; gap: 8px 16px; color: #173b55; }
+.prevention-cards summary > .small { grid-column: 2; color: #087c79; text-decoration: underline; }
+.prevention-cards li > button { border: 0; background: none; display: flex; align-items: start; gap: 12px; padding: 0; color: #173b55; text-align: left; font-weight: 650; line-height: 1.6; }
+.dashboard-icon { width: 60px; height: 60px; border-radius: 50%; display: inline-grid; place-items: center; flex-shrink: 0; }
+.dashboard-icon svg { width: 40px; height: 40px; }
+.prevention-cards summary > .dashboard-icon { grid-row: 1 / span 2; }
+.prevention-cards a { color: #087c79; }
+.full-checklist { padding: 18px 20px; margin-top: 20px; }
+.full-checklist > summary { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; font-size: 26px; font-weight: 700; }
+.full-checklist > .prevention-panel { padding: 16px 0 0; margin: 0; border: 0; box-shadow: none; }
+.prevention-panel > header p { color: var(--muted); font-size: 14px; max-width: 900px; line-height: 1.6; }
+
+/* Native dialog handles keyboard focus and closes with Escape. */
+.method-dialog { width: min(560px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 28px; border: 0; border-radius: 16px; color: #173b55; box-shadow: 0 20px 80px #142b4366; }
+.method-dialog::backdrop { background: #17324e88; }
+.method-dialog form { position: relative; }
+.method-dialog h2 { font-size: 25px; padding-right: 24px; margin-bottom: 10px; }
+.method-dialog h3 { font-size: 15px; margin-bottom: 10px; }
+.method-dialog p { font-size: 13px; line-height: 1.6; }
+.method-dialog .small { font-size: 12px; }
+.dialog-close { position: absolute; right: -12px; top: -16px; width: 44px; height: 44px; border: 0; background: none; color: #173b55; font-size: 30px; }
+.method-weights { padding: 14px; border: 1px solid var(--border); border-radius: 8px; margin: 18px 0; }
+.method-weights ul, .research-links { padding: 0; margin: 0; list-style: none; }
+.method-weights li { display: grid; grid-template-columns: 1.6fr 1fr 46px; align-items: center; gap: 10px; padding: 8px 0; font-size: 12px; }
+.method-track { height: 12px; }
+.method-explanation { background: #edf6fd; padding: 12px 14px; border-radius: 8px; margin-bottom: 12px; }
+.method-explanation p { margin: 0; }
+.research-links { font-size: 13px; line-height: 1.8; }
+.research-links a { color: #087c79; }
+.method-note { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; }
+.dialog-actions { display: flex; justify-content: flex-end; }
+.dialog-actions button { min-width: 110px; }
+
+@media (max-width: 1150px) {
+  .map-layout { grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); }
+  .simulation-scores strong { font-size: 30px; }
+  .factor-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .prevention-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .site-main { padding: 24px 16px; }
+  .header-inner { padding: 10px 16px; gap: 8px; }
+  .header-description { display: none; }
+  .brand { font-size: 20px; white-space: normal; }
+  .brand-logo { width: 40px; height: 40px; }
+  .map-layout { grid-template-columns: 1fr; }
+  .map-column { grid-column: 1; grid-row: 1; }
+  .area-card { grid-column: 1; grid-row: 2; }
+  /* After a selection, show the risk result before the large map on phones. */
+  .has-selection .area-card { grid-row: 1; }
+  .has-selection .map-column { grid-row: 2; }
+  .simulation-section { padding: 18px; }
+  .simulation-section h1 { font-size: 28px; }
+  .simulation-workspace { grid-template-columns: 1fr; }
+  .simulation-preview { position: static; }
+  .simulation-scores { gap: 8px; }
+  .simulation-scores > div { padding: 12px; }
+  .simulation-scores h2 { font-size: 16px; }
+  .simulation-scores strong { font-size: 27px; margin-right: 0; }
+  .simulation-scores small { font-size: 12px; }
+  .simulation-mobile-feedback { display: block; position: sticky; top: 8px; z-index: 2; background: #ecebfc; padding: 12px; border-radius: 8px; border: 1px solid #dbd8f1; font-size: 14px; font-weight: 700; }
+  .simulation-inputs, .simulation-preview { padding: 18px; }
+  .simulation-preview .area-preview-map, .simulation-map-placeholder { height: 260px; min-height: 260px; }
+  .risk-map { height: 330px; }
+  .dashboard-search { gap: 8px; }
+  .dashboard-search .primary { min-width: 112px; }
+  .dashboard-search input { font-size: 14px; padding: 12px; }
+  .map-overlays .toggle-row { min-height: 44px; }
+  .top-risk-list { grid-template-columns: 1fr; }
+  .factor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .area-picker { align-items: start; flex-direction: column; gap: 6px; }
+  .area-picker select { max-width: none; }
+}
+@media (max-width: 480px) {
+  .area-score-hero .risk-index-number strong { font-size: 72px; }
+  .simulation-scores { grid-template-columns: 1fr; }
+  .simulation-scores > div { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .simulation-scores h2 { flex: 1; margin: 0; }
+  .sim-input-row { grid-template-columns: 1fr; gap: 8px; }
+  .sim-number-field { width: 170px; max-width: 100%; }
+  .simulation-workspace h2 { font-size: 24px; }
+  .dashboard-search { flex-direction: column; }
+  .dashboard-search .primary { min-height: 48px; }
+  .factor-grid, .prevention-cards { grid-template-columns: 1fr; }
+  .factor-grid li > strong { min-height: 0; }
+  .area-preview-map { height: 200px; }
+  .method-dialog { padding: 22px 18px; }
+  .method-weights li { grid-template-columns: 1fr 46px; }
+  .method-track { display: none; }
+  .method-dialog h2 { font-size: 22px; }
+}

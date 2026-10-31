@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// - Check the Prevention page has a single h1, also when the checklist fails to load (#60).
+// - Ticket 60: the Prevention section sits under the dashboard's single h1, so it uses an h2,
+//   also when the checklist fails to load. App.test.tsx checks the page has exactly one h1.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -35,16 +36,18 @@ async function renderBoundary(control: PreventionGuidanceControl) {
 }
 
 describe('PreventionGuidanceBoundary headings (#60)', () => {
-  it('has exactly one h1 on the checklist page', async () => {
+  it('uses one h2 and no h1 on the checklist', async () => {
     await renderBoundary(new PreventionGuidanceControl());
-    expect(container.querySelectorAll('h1')).toHaveLength(1);
-    expect(container.querySelector('h1')?.textContent).toContain('Prevention');
+    expect(container.querySelectorAll('h1')).toHaveLength(0);
+    expect(container.querySelectorAll('h2')).toHaveLength(1);
+    expect(container.querySelector('h2')?.textContent).toContain('Prevention');
   });
 
-  it('keeps the h1 when the checklist fails to load', async () => {
+  it('keeps the heading when the checklist fails to load', async () => {
     const empty = new PreventionGuidanceControl({ ...BUNDLED_PREVENTION_CHECKLIST, tasks: [] });
     await renderBoundary(empty);
-    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(container.querySelectorAll('h1')).toHaveLength(0);
+    expect(container.querySelectorAll('h2')).toHaveLength(1);
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
   });
 });

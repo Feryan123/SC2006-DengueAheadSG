@@ -74,9 +74,9 @@ running server instance; a cold start or another instance obtains its own token.
 
 ### Local checks and remaining integration
 
-`npm run dev` runs the frontend only. Vite does **not** serve this Vercel API route,
-so requesting `/api/onemap-search` from Vite is not a live proxy test. No extra
-local server or deployment tooling has been added for this ticket.
+Vite does not run this Vercel function locally. The dashboard's development
+proxy forwards `/api/onemap-search` to the existing deployed function, as
+described under **Inline simulation and local preview** below.
 
 Run the proxy tests without real credentials:
 
@@ -89,7 +89,7 @@ npm run build
 The automated tests simulate OneMap replies and do not contact OneMap. A separate
 local Node.js HTTP check also verified real searches, token reuse and renewal
 after OneMap rejected a test token. Expiry timing is checked by the automated
-tests. P2 frontend integration and Vercel deployment are still pending.
+tests. The dashboard now uses the integrated location control and deployed proxy.
 
 Recorded test results: [ticket #55](../testing/tests/ticket-55.md).
 
@@ -159,59 +159,82 @@ browser's cache Proxy falls back as described above. Errors never include the
 token or GitHub's reply.
 
 Run its checks with `npm test -- --run tests/snapshot.test.ts`.
-## Risk map
+## Dashboard and risk map
 
-Open **Risk Map** from the menu. Select a subzone by clicking its outline,
-searching its name or using the area list. Purple dashed lines mark subzones;
+The website opens directly on the dashboard. Search by subzone name, postal
+code or address, click an outline, or use the area list. Purple dashed lines mark subzones;
 the selected area has a solid bright pink outline.
 
 The legend shows four risk levels, from light blue (Low) to dark blue (Very High).
 Grey means no risk assessment is available; it does not mean Low risk. Map and
 result colours share `src/boundary/riskLevelStyle.ts`.
 
-Selecting an area opens a popup with its level, risk index and up to three main
-factors. **View full assessment** opens that area's result through the app's
-navigation callback. The **Top 10 subzones** list ranks assessed areas by risk
-index, highest first; select a list entry to find it on the map. Areas without
-assessments are left out of this list and their result action is disabled.
+Selecting an area shows its risk index and a fixed map preview beside the main
+map. The preview cannot be dragged or zoomed. Factor cards and expandable NEA
+guidance appear below. **How is this calculated?** opens an explanation of the
+existing model settings and links to the research recorded in the planning notes.
+The **Highest-risk subzones** list shows three entries initially; **View all 10**
+expands it. Areas without assessments are left out of that list.
 
 Leaflet displays [OneMap tiles](https://www.onemap.gov.sg/docs/maps/index.html)
 with the required SLA attribution. Subzone outlines come from
 [URA's Master Plan 2019 dataset](https://data.gov.sg/datasets/d_8594ae9ff96d0c708bc2af633048edfb/view),
 available under the [Singapore Open Data Licence](https://data.gov.sg/open-data-licence).
 
-## App navigation
+## Inline simulation and local preview
 
-`App` uses a `Screen` union for Home, Map, Result, Simulation, Prevention and
-unavailable-data screens. It stores the selected subzone and assessment from
-the screen callbacks. Opening a map result passes the assessment and snapshot
-already displayed on that map, without requesting another calculation.
+**Simulate risk** opens a simulation panel on the same page. The main map and
+other dashboard sections are hidden temporarily. The controls, selected-area
+preview and current/simulated comparison are grouped together. The preview
+changes colour when the simulated risk band changes.
 
-The start-up code can supply `locationControl`, `mapControl`, `preventionControl`
-and `simulationControl` as props. For home assessments, `publicSnapshot` must
-be the same snapshot used by the location control. Simulation keeps that original
-snapshot and baseline. Missing controls or data show an unavailable screen with
-working return actions. Home clears the previous assessment.
+Sliders and numeric inputs adjust humidity (0–100%), rainfall from 2–3 months
+ago (zero or more mm) and high-Aedes area overlap (0–100%). Numeric inputs accept
+decimal values. Typing higher rainfall extends the slider's range. Empty,
+negative, non-finite or out-of-range percentage values show a correction message.
+**Reset to baseline** restores the original values. **Back to current risk map**
+returns to the dashboard. The original assessment and stored data stay unchanged.
 
-Screen components own their forms and result content; `App` connects their
-callbacks and provides the shared navigation, data-source credits and disclaimer.
+`ScenarioAdjustment` accepts either an existing `adjustmentLevel` preset or an
+exact `value`. The control rejects missing or conflicting inputs. Exact raw
+values use humidity percent, rainfall mm and an Aedes overlap ratio from 0–1;
+the UI converts its overlap percentage to that ratio. Existing preset callers
+remain supported. Scoring weights, normalisation and risk bands are unchanged.
+
+`App` keeps the selected subzone, its original assessment and its snapshot
+together. The start-up code still supplies `locationControl`, `mapControl`,
+`preventionControl` and `simulationControl`. Existing controls perform the same
+calculations; the simulation control also validates the exact input values.
+Section backgrounds distinguish the map, rankings, factors, area recommendations
+and full checklist. Risk colours continue to use the shared blue scale.
+`DashboardIcon.tsx` draws small SVG icons for the actions without an icon library.
+
+For local UI checks, `npm run dev` proxies address/postal searches to the existing
+deployed `/api/onemap-search` function at `https://dengue-ahead-sg-three.vercel.app`.
+No OneMap credentials are needed in the local frontend. Subzone-name search
+uses the loaded snapshot. Production still uses this repository's own API route.
+Use the local snapshot-copy instructions above to preview current risk data.
+
+Local check record and diagram follow-ups: [dashboard UI/UX](../testing/tests/ui-dashboard.md).
 
 ## Project structure
 
-The code follows the **Entity–Control–Boundary** pattern from our class diagram. Every class in the diagram has exactly one file, and each file starts with a header comment saying which class and use case it traces to and what is left to implement.
+The code follows the **Entity–Control–Boundary** pattern from our class diagram.
+Boundary components display the dashboard; controls keep the business logic.
+The selected-area preview and calculation popup are small presentation components.
 
 ```
 src/
 ├── main.tsx              React entry point
-├── App.tsx               Root component (screen navigation goes here)
+├── App.tsx               Root component (dashboard selection and simulation)
 ├── style.css
 ├── entity/               <<entity>> — data shapes only, no logic
 │   ├── enums.ts          all enumerations
 │   └── *.ts              LocationQuery, PlanningSubzone, RiskAssessment, ...
 ├── control/              <<control>> — business logic, no React
 │   └── *Control.ts       LocationRiskControl, RiskAssessmentControl, ...
-├── boundary/             <<boundary>> — React components (screens)
-│   └── *Boundary.tsx     HomePageBoundary, RiskMapBoundary, ...
+├── boundary/             <<boundary>> — React components (dashboard sections)
+│   └── *.tsx             RiskMapBoundary, SelectedAreaPreview, ...
 └── services/             <<boundary>> to external systems
     ├── GeocodingMapServiceBoundary.ts
     ├── ApprovedPublicDataServiceBoundary.ts
@@ -224,11 +247,11 @@ Dependency rule: `boundary → control → entity / services`. Boundaries never 
 
 | Use case | Boundary | Control |
 |---|---|---|
-| UC-1 Assess Location Risk | HomePageBoundary, RiskResultBoundary | LocationRiskControl, RiskAssessmentControl |
+| UC-1 Assess Location Risk | RiskMapBoundary, RiskResultBoundary | LocationRiskControl, RiskAssessmentControl |
 | UC-2 Explore Risk Map | RiskMapBoundary | RiskMapControl |
-| UC-3 Identify Planning Subzone | (via UC-1) | LocationRiskControl + GeocodingMapServiceBoundary |
+| UC-3 View Prevention Guidance | PreventionGuidanceBoundary | PreventionGuidanceControl |
 | UC-4 Simulate Risk Scenario | SimulationBoundary | RiskSimulationControl |
-| UC-5 View Prevention Guidance | PreventionGuidanceBoundary | PreventionGuidanceControl |
+| UC-5 Identify Planning Subzone | (via UC-1) | LocationRiskControl + GeocodingMapServiceBoundary |
 
 ## Conventions
 

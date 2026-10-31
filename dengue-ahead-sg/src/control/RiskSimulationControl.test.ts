@@ -89,6 +89,49 @@ function makeControl() {
 }
 
 describe('RiskSimulationControl', () => {
+  it.each([
+    [AdjustableRiskFactorType.Humidity, 0, true],
+    [AdjustableRiskFactorType.Humidity, 100, true],
+    [AdjustableRiskFactorType.Humidity, 100.1, false],
+    [AdjustableRiskFactorType.LaggedRainfall, 1500.25, true],
+    [AdjustableRiskFactorType.LaggedRainfall, -1, false],
+    [AdjustableRiskFactorType.HighAedesArea, 0, true],
+    [AdjustableRiskFactorType.HighAedesArea, 1, true],
+    [AdjustableRiskFactorType.HighAedesArea, 1.01, false],
+    [AdjustableRiskFactorType.Humidity, NaN, false],
+    [AdjustableRiskFactorType.LaggedRainfall, Infinity, false],
+  ])('validates exact %s value %s', async (factorType, value, valid) => {
+    const { control } = makeControl();
+    expect(await control.validateAdjustment({ factorType, value })).toBe(valid);
+  });
+
+  it('rejects missing values and conflicting preset/exact inputs', async () => {
+    const { control } = makeControl();
+    expect(await control.validateAdjustment({ factorType: AdjustableRiskFactorType.Humidity })).toBe(false);
+    expect(await control.validateAdjustment({ factorType: AdjustableRiskFactorType.Humidity,
+      value: 80, adjustmentLevel: AdjustmentLevel.Increase })).toBe(false);
+  });
+
+  it('passes exact decimal values to the existing formula without changing the original data', async () => {
+    const { control, generateAssessment } = makeControl();
+    const snapshot = makeSnapshot();
+    const before = structuredClone(snapshot);
+    const adjustments = [
+      { factorType: AdjustableRiskFactorType.Humidity, value: 81.25 },
+      { factorType: AdjustableRiskFactorType.LaggedRainfall, value: 156.75 },
+      { factorType: AdjustableRiskFactorType.HighAedesArea, value: 0.1234 },
+    ];
+    const result = await control.recalculateScenario(baseline, adjustments, snapshot);
+    const changed = generateAssessment.mock.calls[0][1];
+    expect(changed.weather.meanHumidityPct).toBe(81.25);
+    expect(changed.weather.rainfallMm).toBe(156.75);
+    expect(changed.subzones[0].aedesOverlapRatio).toBe(0.1234);
+    expect(changed.subzones[0].clusterCasesNearby).toBe(before.subzones[0].clusterCasesNearby);
+    expect(changed.subzones[0].residentsPerKm2).toBe(before.subzones[0].residentsPerKm2);
+    expect(snapshot).toEqual(before);
+    expect(result.scenario.adjustments).toEqual(adjustments);
+  });
+
   it('accepts valid adjustable factors and adjustment levels', async () => {
     const { control } = makeControl();
 

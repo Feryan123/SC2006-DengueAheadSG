@@ -64,23 +64,21 @@ describe('Offline backup screens (Ticket #58)', () => {
     const app = await initializeApplication();
     await act(async () => root.render(<App {...app.appProps} />));
 
-    await click('Risk Map');
     expect(container.querySelectorAll('path.leaflet-interactive')).toHaveLength(332);
     expectBackupNotice();
 
     const area = container.querySelector('path.leaflet-interactive');
     if (!area) throw new Error('No subzone was drawn on the map');
     await act(async () => area.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    await click('View Assessment');
-    expect(container.querySelector('h1')?.textContent).toBe(bundledSnapshot.subzones[0].name);
+    expect(container.querySelector('[aria-label="Selected area"] h2')?.textContent).toBe(bundledSnapshot.subzones[0].name);
     expectBackupNotice();
 
-    await click('Simulate a scenario');
-    expect(container.textContent).toContain('Simulate risk');
+    await click('Simulate risk');
+    expect(container.querySelector('[aria-label="Risk simulation"]')).not.toBeNull();
     expectBackupNotice();
 
-    await click('Home');
-    expect(container.querySelector('[aria-label="Backup data"]')).toBeNull();
+    await click('Back to current risk map');
+    expectBackupNotice();
   });
 
   it('does not show a backup notice when the network snapshot loads', async () => {
@@ -88,7 +86,6 @@ describe('Offline backup screens (Ticket #58)', () => {
     const app = await initializeApplication();
     await act(async () => root.render(<App {...app.appProps} />));
 
-    await click('Risk Map');
 
     expect(container.querySelectorAll('path.leaflet-interactive')).toHaveLength(332);
     expect(container.querySelector('[aria-label="Backup data"]')).toBeNull();
