@@ -20,6 +20,7 @@ import type { PlanningSubzone } from './entity/PlanningSubzone.ts';
 import type { RiskAssessment } from './entity/RiskAssessment.ts';
 import type { DengueCluster } from './entity/DengueCluster.ts';
 import type { PublicDataSnapshot } from './services/ApprovedPublicDataServiceBoundary.ts';
+import DataFreshnessNotice from './boundary/DataFreshnessNotice.tsx';
 
 export type Screen = 'home' | 'map' | 'result' | 'simulation' | 'prevention' | 'dataUnavailable';
 
@@ -241,7 +242,12 @@ export default function App(props: AppProps = {}) {
       </header>
       <main className="site-main" id="main-content" tabIndex={-1}>
         {screen === 'result' || screen === 'simulation'
-          ? <BundledFallbackNotice snapshot={snapshot} />
+          ? (
+            <>
+              <BundledFallbackNotice snapshot={snapshot} />
+              <DataFreshnessNotice snapshot={snapshot} />
+            </>
+          )
           : null}
         {showScreen()}
       </main>
