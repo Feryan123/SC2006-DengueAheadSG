@@ -83,7 +83,7 @@ export function PreventionGuidanceBoundary({control, onBack}: PreventionGuidance
     if (loadError) {
         return (
             <section aria-labelledby="prevention-heading" className="prevention-guidance-boundary">
-                <h2 id="prevention-heading">Dengue Prevention Guidance</h2>
+                <h1 id="prevention-heading">Dengue Prevention Guidance</h1>
                 <div role="alert">{loadError}</div>
                 {backButton}
             </section>
@@ -93,7 +93,7 @@ export function PreventionGuidanceBoundary({control, onBack}: PreventionGuidance
     return (
         <section aria-labelledby="prevention-heading" className="prevention-guidance-boundary">
             <header>
-                <h2 id="prevention-heading">Official Dengue Prevention Checklist</h2>
+                <h1 id="prevention-heading">Official Dengue Prevention Checklist</h1>
 
                 <p>
                     Public dengue prevention guidance based on the National Environment Agency (NEA)
