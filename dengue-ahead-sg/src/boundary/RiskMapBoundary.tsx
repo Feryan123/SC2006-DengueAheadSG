@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
 import { createSubzonePopup } from './SubzonePopup.ts';
 import BundledFallbackNotice from './BundledFallbackNotice.tsx';
+import DataFreshnessNotice from './DataFreshnessNotice.tsx';
 import {
   RiskMapControl,
   type MapResult,
@@ -361,6 +362,7 @@ export default function RiskMapBoundary({ onRequestAssessment, control = default
       )}
 
       <BundledFallbackNotice snapshot={data?.snapshot} />
+      <DataFreshnessNotice snapshot={data?.snapshot} />
 
       {searchMessage && <p role="status">{searchMessage}</p>}
 
