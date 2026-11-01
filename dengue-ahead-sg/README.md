@@ -169,10 +169,26 @@ The legend shows four risk levels, from light blue (Low) to dark blue (Very High
 Grey means no risk assessment is available; it does not mean Low risk. Map and
 result colours share `src/boundary/riskLevelStyle.ts`.
 
-Selecting an area shows its risk index and a fixed map preview beside the main
-map. The preview cannot be dragged or zoomed. Factor cards and expandable NEA
-guidance appear below. **How is this calculated?** opens an explanation of the
-existing model settings and links to the research recorded in the planning notes.
+The compact desktop toolbar puts the heading and search side by side.
+**Across Singapore** shows the snapshot's subzone, dengue-cluster and High-Aedes
+area counts. These are national dataset counts, not case counts for the selected
+area. Failed overlay data is labelled **Unavailable**. One **Data updated** time
+appears beside the totals. Stale-data details can be expanded from the warning.
+
+Selecting an area shows its risk index beside a fixed map preview, with the
+**Score breakdown** below them in the same panel. The preview cannot be dragged
+or zoomed. Readings and points are visible without factor dropdowns. The single
+**How is this calculated?** button opens the existing settings and research links.
+Data-confidence help also shows the assessment time. Navy backgrounds improve
+contrast while preserving the existing risk colours. Desktop panels reserve the
+same space before and after selection. Phones stack the result before the map.
+Expandable NEA guidance appears below the map and ranking.
+The selected area's cluster summary sits inside the main map card, above its
+legend. It reuses `clustersForSubzone`, including clusters that overlap the area.
+Case totals refer to the linked clusters, which may cross subzone boundaries.
+The row distinguishes no selection, no recorded clusters and unavailable data;
+national totals remain separate. There is no duplicate cluster panel below the
+dashboard ranking.
 The **Highest-risk subzones** list shows three entries initially; **View all 10**
 expands it. Areas without assessments are left out of that list.
 

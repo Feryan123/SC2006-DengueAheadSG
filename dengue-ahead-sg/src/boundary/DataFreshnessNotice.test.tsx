@@ -40,8 +40,8 @@ afterEach(async () => {
   container.remove();
 });
 
-async function show(snapshot: PublicDataSnapshot | null | undefined) {
-  await act(async () => root.render(<DataFreshnessNotice snapshot={snapshot} now={NOW} />));
+async function show(snapshot: PublicDataSnapshot | null | undefined, compact = false) {
+  await act(async () => root.render(<DataFreshnessNotice snapshot={snapshot} now={NOW} compact={compact} />));
 }
 
 describe('DataFreshnessNotice (ticket 30)', () => {
@@ -80,5 +80,21 @@ describe('DataFreshnessNotice (ticket 30)', () => {
   it('leaves out "Last updated" when the snapshot time is invalid', async () => {
     await show(makeSnapshot(DatasetStatus.Fresh, { generatedAt: 'nonsense' }));
     expect(container.textContent).not.toContain('Last updated');
+  });
+
+  it('keeps the compact warning visible and its dataset details available on request', async () => {
+    await show(makeSnapshot(DatasetStatus.Stale), true);
+    const details = container.querySelector('details')!;
+    expect(details.open).toBe(false);
+    expect(details.querySelector('summary')?.textContent).toContain('Some source data may be out of date');
+    expect(details.querySelector('p')?.textContent).toContain('Dengue clusters');
+    expect(container.querySelectorAll('time')).toHaveLength(1);
+    expect(container.querySelector('.snapshot-updated')?.textContent).toContain('Data updated:');
+  });
+
+  it('keeps one compact update time without duplicating the bundled-backup warning', async () => {
+    await show(makeSnapshot(DatasetStatus.Stale, { isBundledFallback: true }), true);
+    expect(container.querySelector('.notice')).toBeNull();
+    expect(container.querySelectorAll('time')).toHaveLength(1);
   });
 });

@@ -3,6 +3,8 @@
 // - Use Leaflet for the map and RiskMapControl for its data (UC-2).
 // - Show a warning when the map uses saved backup data (Ticket #58).
 // - Show the base-map warning only after its images fail to load (Ticket #57).
+// - Show Singapore-wide totals and one update time above compact, matching panels.
+// - Keep the selected area's recorded clusters inside the main map card.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as L from 'leaflet';
@@ -10,8 +12,10 @@ import 'leaflet/dist/leaflet.css';
 import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
 import BundledFallbackNotice from './BundledFallbackNotice.tsx';
 import DataFreshnessNotice from './DataFreshnessNotice.tsx';
+import DashboardIcon from './DashboardIcon.tsx';
 import type { LocationRiskControl } from '../control/LocationRiskControl.ts';
-import { ValidationStatus } from '../entity/enums.ts';
+import { DatasetStatus, ValidationStatus } from '../entity/enums.ts';
+import { clustersForSubzone } from '../control/clustersForSubzone.ts';
 import {
   RiskMapControl,
   type MapResult,
@@ -82,6 +86,12 @@ export default function RiskMapBoundary({
   const unavailableStyle = getRiskLevelStyle();
   const topSubzones = data ? control.getTopSubzones(data) : [];
   const simulationVisible = Boolean(simulation);
+  const selectedSubzone = data?.subzones.find((zone) => zone.subzoneId === selectedId);
+  const clusterDataAvailable = Boolean(data?.snapshot) &&
+    data?.snapshot?.datasets?.dengueClusters?.status !== DatasetStatus.Failed;
+  const selectedClusters = selectedSubzone && data && clusterDataAvailable
+    ? clustersForSubzone(data.dengueClusters, selectedSubzone) : [];
+  const selectedCaseCount = selectedClusters.reduce((sum, cluster) => sum + cluster.caseCount, 0);
 
   useEffect(() => {
     if (!mapElement.current) return;
@@ -374,11 +384,10 @@ export default function RiskMapBoundary({
   return (
     <section aria-label="Dengue risk dashboard">
       <BundledFallbackNotice snapshot={data?.snapshot} />
-      <DataFreshnessNotice snapshot={data?.snapshot} />
+      {simulationVisible && <DataFreshnessNotice snapshot={data?.snapshot} />}
       <div hidden={simulationVisible}>
         <div className="dashboard-heading">
           <h1>Check dengue risk in your area</h1>
-          <p className="muted">Search for an area or select it on the map.</p>
           <form
             className="search-row dashboard-search"
             onSubmit={(event) => {
@@ -390,7 +399,7 @@ export default function RiskMapBoundary({
               type="search"
               aria-label="Postal code, address or subzone name"
               aria-describedby="search-help"
-              placeholder="Enter a postal code or subzone name"
+              placeholder="Postal code or area name"
               list="subzone-suggestions"
               maxLength={200}
               value={search}
@@ -405,7 +414,7 @@ export default function RiskMapBoundary({
               {searching ? 'Searching…' : 'Search area'}
             </button>
           </form>
-          <p className="small muted" id="search-help">
+          <p className="sr-only" id="search-help">
             For example: 680123, Aljunied or a Singapore address.
           </p>
           {searchMessage && (
@@ -413,6 +422,26 @@ export default function RiskMapBoundary({
               {searchMessage}
             </p>
           )}
+        </div>
+        <div className="snapshot-overview">
+          <div className="snapshot-totals" role="group" aria-label="Singapore-wide data">
+            <strong>Across Singapore</strong>
+            <span className="snapshot-stat">
+              <DashboardIcon name="grid" />
+              <strong>{data?.subzones.length ?? '—'}</strong> Subzones
+            </span>
+            <span className="snapshot-stat">
+              <DashboardIcon name="pin" />
+              <strong>{data?.snapshot?.datasets?.dengueClusters?.status === DatasetStatus.Failed
+                ? 'Unavailable' : data?.dengueClusters.length ?? '—'}</strong> Dengue clusters
+            </span>
+            <span className="snapshot-stat">
+              <DashboardIcon name="mosquito" />
+              <strong>{data?.snapshot?.datasets?.highAedesAreas?.status === DatasetStatus.Failed
+                ? 'Unavailable' : data?.highAedesAreas.length ?? '—'}</strong> High-Aedes areas
+            </span>
+          </div>
+          <DataFreshnessNotice snapshot={data?.snapshot} compact />
         </div>
         {control === defaultControl && (
           <p className="notice">
@@ -463,6 +492,25 @@ export default function RiskMapBoundary({
                   The base map is unavailable. Area boundaries can still be viewed.
                 </p>
               )}
+              <div
+                className={`map-cluster-status${selectedClusters.length ? ' has-clusters' : ''}`}
+                role="status"
+                aria-label="Selected-area cluster information"
+              >
+                <DashboardIcon name="pin" />
+                {!selectedSubzone ? (
+                  <span>Select an area for cluster information.</span>
+                ) : !clusterDataAvailable ? (
+                  <span>Cluster data for this area: <strong>Unavailable</strong></span>
+                ) : selectedClusters.length === 0 ? (
+                  <span>Clusters linked to this area: <strong>None recorded</strong></span>
+                ) : (
+                  <span>
+                    Clusters linked to this area: <strong>{selectedClusters.length}</strong>
+                    {' · '}Cases reported across these clusters: <strong>{selectedCaseCount}</strong>
+                  </span>
+                )}
+              </div>
               <div className="map-legend" aria-label="Risk levels">
                 {Object.entries(riskLevelStyle).map(([level, style]) => (
                   <span key={level}>
@@ -474,13 +522,10 @@ export default function RiskMapBoundary({
                   <i style={{ backgroundColor: unavailableStyle.colour }} aria-hidden="true" />
                   Risk unavailable
                 </span>
+                <span><i className="selection-key" aria-hidden="true" />Selected area</span>
               </div>
-              <p className="muted small map-key">
-                Darker blue means higher risk. A pink outline marks your selection. The main map
-                shows current risk.
-              </p>
               <div className="area-picker">
-                <label htmlFor="subzone">Planning Subzone</label>
+                <label htmlFor="subzone">Area</label>
                 <select
                   id="subzone"
                   disabled={!data}
@@ -495,7 +540,7 @@ export default function RiskMapBoundary({
                   ))}
                 </select>
               </div>
-              <p className="small muted map-data-status" role="status">
+              <p className={result?.status === 'OK' && !mapError ? 'sr-only' : 'small muted map-data-status'} role="status">
                 {!result
                   ? 'Loading area data…'
                   : result.status !== 'OK'

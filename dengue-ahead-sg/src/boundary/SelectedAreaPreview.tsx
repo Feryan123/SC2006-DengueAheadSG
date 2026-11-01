@@ -1,16 +1,17 @@
 // - Show the selected area's existing boundary in a fixed map preview.
 // - Disable dragging, zooming and keyboard map controls in this preview.
 // - Reuse the fixed area map in the simulation panel.
-// - Centre the current score and risk label above the map so they stand out.
+// - Keep the score beside the fixed preview in a compact desktop layout.
 // - Keep the calculation explanation and simulation button beside the result.
+// - Group the factor breakdown with the selected area's score and fixed map.
 
 import { useEffect, useRef } from 'react';
 import * as L from 'leaflet';
 import type { MapAssessmentSelection } from '../control/RiskMapControl.ts';
 import type { PlanningSubzone } from '../entity/PlanningSubzone.ts';
 import type { RiskLevel } from '../entity/enums.ts';
-import { getRiskLevelStyle } from './riskLevelStyle.ts';
-import RiskMethodPopup from './RiskMethodPopup.tsx';
+import { getRiskLevelStyle, riskLevelStyle } from './riskLevelStyle.ts';
+import RiskFactorBreakdown from './RiskFactorBreakdown.tsx';
 
 type Props = {
   selection: MapAssessmentSelection | null;
@@ -103,15 +104,12 @@ export default function SelectedAreaPreview({
     return (
       <aside className="card area-card empty-area" aria-label="Selected area">
         <h2>Your area</h2>
-        <span className="location-symbol" aria-hidden="true">
-          ⌖
-        </span>
-        <p className="muted">Enter a postal code or area name, or select an area on the map.</p>
-        {message && (
-          <p role="status" className="error-text">
-            {message}
-          </p>
-        )}
+        <div className="empty-area-content">
+          <span className="location-symbol" aria-hidden="true">⌖</span>
+          <p className="muted">Enter a postal code or area name, or select an area on the map.</p>
+          {message && <p role="status" className="error-text">{message}</p>}
+        </div>
+        <button className="primary simulate-button" disabled>Simulate risk</button>
       </aside>
     );
   }
@@ -123,34 +121,48 @@ export default function SelectedAreaPreview({
     <aside className="card area-card" aria-label="Selected area">
       <div className="area-title">
         <h2>{subzone.name}</h2>
+        <details className="confidence-help">
+          <summary>Data confidence: <strong>{assessment.dataConfidence.toLowerCase()}</strong> ⓘ</summary>
+          <p>
+            Confidence describes the availability and freshness of the input data,
+            not the accuracy of the prediction. Check any data warning above.
+            <br />Assessed {formatTime(assessment.generatedAt)} SGT.
+          </p>
+        </details>
       </div>
-      <p className="muted small">Selected planning subzone</p>
-      <div className="area-score area-score-hero" aria-live="polite">
-        <h3>Dengue risk index</h3>
-        <div className="risk-index-number">
-          <strong>{shown.riskIndex.toFixed(1)}</strong>
-          <span>/ 100</span>
+      <div className="area-overview">
+        <div className="area-score area-score-hero" aria-live="polite">
+          <h3>Dengue risk index</h3>
+          <div className="risk-index-number">
+            <strong>{shown.riskIndex.toFixed(1)}</strong>
+            <span>/ 100</span>
+          </div>
+          <span
+            className="risk-pill"
+            style={{ backgroundColor: style.colour, color: style.textColour }}
+          >
+            {style.label} risk
+          </span>
+          <div className="risk-scale" aria-hidden="true">
+            {Object.values(riskLevelStyle).map((level) => (
+              <span
+                key={level.label}
+                className="risk-scale-segment"
+                style={{ backgroundColor: level.colour }}
+              />
+            ))}
+            <i className="risk-scale-marker" style={{ left: `${assessment.riskIndex}%` }} />
+          </div>
+          <div className="risk-scale-labels" aria-hidden="true">
+            <span>Low</span>
+            <span>Moderate</span>
+            <span>High</span>
+            <span>Very High</span>
+          </div>
         </div>
-        <span
-          className="risk-pill"
-          style={{ backgroundColor: style.colour, color: style.textColour }}
-        >
-          {style.label} risk
-        </span>
-        <div className="risk-scale" aria-hidden="true">
-          <span style={{ left: `${assessment.riskIndex}%` }} />
-        </div>
-        <div className="risk-scale-labels" aria-hidden="true">
-          <span>Low</span>
-          <span>Moderate</span>
-          <span>High</span>
-          <span>Very High</span>
-        </div>
+        <SelectedAreaMap zone={subzone} riskLevel={shown.riskLevel} />
       </div>
-      <div className="area-method-link">
-        <RiskMethodPopup />
-      </div>
-      <SelectedAreaMap zone={subzone} riskLevel={shown.riskLevel} />
+      <RiskFactorBreakdown contributions={assessment.contributions} />
       <button
         id="start-simulation"
         className="primary simulate-button"
@@ -160,15 +172,6 @@ export default function SelectedAreaPreview({
         Simulate risk
       </button>
       {!canSimulate && <p className="small muted">Simulation is unavailable right now.</p>}
-      <p className="small confidence-note">
-        Data confidence: <strong>{assessment.dataConfidence.toLowerCase()}</strong>
-      </p>
-      <p className="muted small">
-        Confidence describes the availability and freshness of the data.
-      </p>
-      <p className="muted small data-time">
-        Data updated {formatTime(assessment.dataTimeStamp)} SGT
-      </p>
     </aside>
   );
 }

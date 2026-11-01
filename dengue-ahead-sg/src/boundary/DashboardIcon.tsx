@@ -6,6 +6,14 @@
 import type { ReactNode } from 'react';
 
 const icons: Record<string, { colour: string; background: string; drawing: ReactNode }> = {
+  grid: {
+    colour: '#2171b5', background: '#e1f2ff',
+    drawing: <path d="M5 5h12v12H5Zm18 0h12v12H23ZM5 23h12v12H5Zm18 0h12v12H23Z" fill="#2171b5" />,
+  },
+  pin: {
+    colour: '#dc2626', background: '#fde5e5',
+    drawing: <><path d="M20 36S7 23 7 15a13 13 0 0 1 26 0c0 8-13 21-13 21Z" fill="#dc2626" /><circle cx="20" cy="15" r="5" fill="white" stroke="white" /></>,
+  },
   soil: {
     colour: '#2d7a46',
     background: '#d9efda',

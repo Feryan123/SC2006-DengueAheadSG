@@ -2,6 +2,7 @@
 // - Check the real dashboard from search and map selection through simulation.
 // - Keep the main map and original assessment unchanged during a what-if preview.
 // - Check safe errors, source links and the calculation popup without live APIs.
+// - Keep one visible factor breakdown beside the selected area's result.
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -14,7 +15,10 @@ import { MockPublicDataService } from './services/mocks/MockPublicDataService.ts
 import {
   AdjustableRiskFactorType,
   AssessmentType,
+  ContributionLevel,
   DataConfidence,
+  DatasetStatus,
+  RiskFactorType,
   RiskLevel,
   QueryType,
   ValidationStatus,
@@ -160,6 +164,102 @@ describe('Single-page dashboard', () => {
     await search(`  ${snapshot.subzones[0].name.toLowerCase()}  `);
     expect(selectedCard().querySelector('h2')?.textContent).toBe(snapshot.subzones[0].name);
     expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('groups the five factor readings and one calculation popup inside the area card', async () => {
+    baseline.contributions = [
+      { factorType: RiskFactorType.Humidity, inputValue: 77.3, contribution: 7,
+        contributionLevel: ContributionLevel.Moderate, explanation: 'Humidity scores 53/100' },
+      { factorType: RiskFactorType.LaggedRainfall, inputValue: 112, contribution: 2.6,
+        contributionLevel: ContributionLevel.Moderate, explanation: 'Rainfall comparison' },
+      { factorType: RiskFactorType.PopulationDensity, inputValue: 13503, contribution: 12.4,
+        contributionLevel: ContributionLevel.Moderate, explanation: 'Population comparison' },
+      { factorType: RiskFactorType.HighAedesArea, inputValue: 0.05, contribution: 18,
+        contributionLevel: ContributionLevel.High, explanation: 'Area overlap comparison' },
+      { factorType: RiskFactorType.DengueClusters, inputValue: 0, contribution: 0,
+        contributionLevel: ContributionLevel.Low, explanation: 'Cluster comparison' },
+    ];
+    await renderDashboard();
+    await selectFirstArea();
+
+    const card = selectedCard();
+    const breakdown = card.querySelector('.score-breakdown')!;
+    expect(container.querySelectorAll('.score-breakdown')).toHaveLength(1);
+    expect(breakdown.querySelectorAll('.factor-list > li')).toHaveLength(5);
+    expect(breakdown.querySelector('.factor-list > li')?.textContent).toContain('Adds 18.0 points');
+    expect(breakdown.textContent).toContain('77.3% humidity');
+    expect(breakdown.textContent).toContain('112 mm of rain from 2–3 months ago');
+    expect(breakdown.textContent).toContain('13,503 residents/km²');
+    expect(breakdown.textContent).toContain('5% of this area overlaps');
+    expect(breakdown.textContent).toContain('0 cluster cases nearby');
+    expect(breakdown.querySelector('details')).toBeNull();
+    expect(breakdown.textContent).not.toContain('53/100');
+    expect(container.textContent).not.toContain('Why this matters');
+    expect(card.querySelectorAll('.risk-scale-segment')).toHaveLength(4);
+    expect(container.querySelectorAll('.method-link')).toHaveLength(1);
+    expect(breakdown.querySelector('.method-link')).not.toBeNull();
+    const ranking = container.querySelector('.map-ranking')!;
+    expect(card.compareDocumentPosition(ranking) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows national totals and one update time in both empty and selected states', async () => {
+    await renderDashboard();
+    const totals = container.querySelector('[aria-label="Singapore-wide data"]')!;
+    const counts = [...totals.querySelectorAll('.snapshot-stat > strong')].map(e => e.textContent);
+    expect(counts).toEqual([
+      String(snapshot.subzones.length), String(snapshot.dengueClusters.length),
+      String(snapshot.highAedesAreas.length),
+    ]);
+    expect(selectedCard().querySelector('.risk-index-number')).toBeNull();
+    expect(selectedCard().querySelector('button')?.disabled).toBe(true);
+    expect(container.querySelector('.map-cluster-status')?.textContent).toContain('Select an area');
+    expect(container.querySelectorAll('.snapshot-updated time')).toHaveLength(1);
+    await selectFirstArea();
+    expect(container.querySelectorAll('.snapshot-updated time')).toHaveLength(1);
+    expect(selectedCard().querySelector('.area-overview .risk-index-number')).not.toBeNull();
+    expect(selectedCard().querySelector('.area-overview .area-preview-map')).not.toBeNull();
+    expect(selectedCard().querySelector('.confidence-help')).not.toBeNull();
+    expect(selectedCard().querySelector('.data-time')).toBeNull();
+  });
+
+  it('labels failed overlay counts as unavailable instead of showing a misleading zero', async () => {
+    snapshot.datasets = {
+      ...snapshot.datasets,
+      dengueClusters: { status: DatasetStatus.Failed, retrievedAt: snapshot.generatedAt },
+      highAedesAreas: { status: DatasetStatus.Failed, retrievedAt: snapshot.generatedAt },
+    };
+    await renderDashboard();
+    const counts = [...container.querySelectorAll('.snapshot-stat > strong')].map(e => e.textContent);
+    expect(counts.slice(1)).toEqual(['Unavailable', 'Unavailable']);
+    await selectFirstArea();
+    expect(container.querySelector('.map-cluster-status')?.textContent).toContain('Unavailable');
+    expect(container.querySelector('.map-cluster-status')?.textContent).not.toContain('None recorded');
+  });
+
+  it('puts overlapping-cluster counts inside the map and keeps national totals separate', async () => {
+    // This cluster overlaps the selected zone although its stored ID names another zone.
+    snapshot.dengueClusters = [
+      { ...snapshot.dengueClusters[0], caseCount: 20,
+        subzoneId: snapshot.subzones[1].subzoneId, geometry: snapshot.subzones[0].boundary },
+      snapshot.dengueClusters[2],
+    ];
+    await renderDashboard();
+    await selectFirstArea();
+    const row = container.querySelector('.map-cluster-status')!;
+    expect(row.closest('.map-card')).not.toBeNull();
+    expect([...row.querySelectorAll('strong')].map(e => e.textContent)).toEqual(['1', '20']);
+    expect(row.textContent).toContain('Cases reported across these clusters');
+    expect(container.querySelectorAll('.snapshot-stat > strong')[1].textContent).toBe('2');
+    expect(container.querySelector('#clusters-heading')).toBeNull();
+    expect(row.compareDocumentPosition(container.querySelector('.map-legend')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows none recorded only when usable cluster data has no matching records', async () => {
+    snapshot.dengueClusters = [];
+    await renderDashboard();
+    await selectFirstArea();
+    expect(container.querySelector('.map-cluster-status')?.textContent).toContain('None recorded');
+    expect(container.querySelector('.map-cluster-status')?.textContent).not.toContain('Unavailable');
   });
 
   it('uses the postal search service and preserves the baseline shown on the map', async () => {
