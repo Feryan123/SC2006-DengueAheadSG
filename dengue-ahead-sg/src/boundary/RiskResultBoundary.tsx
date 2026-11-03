@@ -16,13 +16,14 @@ import type { DengueCluster } from "../entity/DengueCluster.ts";
 import type { PlanningSubzone } from "../entity/PlanningSubzone.ts";
 import type { PreventionTask } from "../entity/PreventionTask.ts";
 import type { RiskAssessment } from "../entity/RiskAssessment.ts";
-import { ContributionLevel, DataConfidence, RiskFactorType, RiskLevel } from "../entity/enums.ts";
+import { DataConfidence, RiskLevel } from "../entity/enums.ts";
 import { PreventionGuidanceControl } from "../control/PreventionGuidanceControl.ts";
 import { getRiskLevelStyle } from "./riskLevelStyle.ts";
-import DashboardIcon, { PreventionIcon } from "./DashboardIcon.tsx";
+import { PreventionIcon } from "./DashboardIcon.tsx";
+import RiskFactorBreakdown from "./RiskFactorBreakdown.tsx";
 
 export interface RiskResultBoundaryProps {
-    /** Embed the factors and tips below the dashboard's area preview. */
+    /** Show tips below the dashboard; its map and sidebar already show clusters and factors. */
     embedded?: boolean;
     subzone: PlanningSubzone;
     assessment: RiskAssessment;
@@ -37,28 +38,6 @@ const defaultPreventionControl = new PreventionGuidanceControl();
 
 const DISCLAIMER =
     "This is an estimate based on public data and a simple model. It is not an official NEA forecast or medical advice.";
-
-const FACTOR_LABELS: Record<RiskFactorType, string> = {
-    [RiskFactorType.DengueClusters]: "Dengue clusters nearby",
-    [RiskFactorType.HighAedesArea]: "High-Aedes area overlap",
-    [RiskFactorType.PopulationDensity]: "Population density",
-    [RiskFactorType.Humidity]: "Humidity (latest month)",
-    [RiskFactorType.LaggedRainfall]: "Rainfall from 2-3 months ago",
-};
-
-const CONTRIBUTION_LABELS: Record<ContributionLevel, string> = {
-    [ContributionLevel.Low]: "Low contribution",
-    [ContributionLevel.Moderate]: "Moderate contribution",
-    [ContributionLevel.High]: "High contribution",
-};
-
-const FACTOR_ICONS: Record<RiskFactorType, string> = {
-    [RiskFactorType.DengueClusters]: "shield",
-    [RiskFactorType.HighAedesArea]: "mosquito",
-    [RiskFactorType.PopulationDensity]: "people",
-    [RiskFactorType.Humidity]: "cloud",
-    [RiskFactorType.LaggedRainfall]: "rain",
-};
 
 const CONFIDENCE_TEXT: Record<DataConfidence, { label: string; text: string }> = {
     [DataConfidence.High]: {
@@ -213,10 +192,6 @@ export function RiskResultBoundary(props: RiskResultBoundaryProps) {
         const confidence = CONFIDENCE_TEXT[assessment.dataConfidence] as
             | { label: string; text: string }
             | undefined;
-        const contributions = [...(assessment.contributions ?? [])].sort(
-            (a, b) => b.contribution - a.contribution,
-        );
-        const largestContribution = Math.max(1, contributions[0]?.contribution ?? 0);
 
         return (
             <>
@@ -253,45 +228,11 @@ export function RiskResultBoundary(props: RiskResultBoundaryProps) {
                     </>
                 )}
 
-                <section aria-labelledby="factors-heading" className="card risk-factors">
-                    <h2 id="factors-heading">
-                        {props.embedded
-                            ? "What contributes to the current risk?"
-                            : "Why this level"}
-                    </h2>
-                    {contributions.length === 0 ? (
-                        <p>Factor details are not available for this assessment.</p>
-                    ) : (
-                        <ol aria-label="Risk factor contributions" className="factor-grid">
-                            {contributions.map((item) => (
-                                <li key={item.factorType}>
-                                    <DashboardIcon name={FACTOR_ICONS[item.factorType]} />
-                                    <strong>
-                                        {FACTOR_LABELS[item.factorType] ?? item.factorType}
-                                    </strong>{" "}
-                                    <span className="factor-value">
-                                        {item.contribution.toFixed(1)} points ·{" "}
-                                        {CONTRIBUTION_LABELS[item.contributionLevel] ??
-                                            item.contributionLevel}
-                                    </span>
-                                    <div className="factor-track" aria-hidden="true">
-                                        <span
-                                            style={{
-                                                width: `${(item.contribution / largestContribution) * 100}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <details>
-                                        <summary>Why this matters</summary>
-                                        <p>{item.explanation}</p>
-                                    </details>
-                                </li>
-                            ))}
-                        </ol>
-                    )}
-                </section>
+                {!props.embedded && (
+                    <RiskFactorBreakdown contributions={assessment.contributions} />
+                )}
 
-                {clusters && (
+                {!props.embedded && clusters && (
                     <section aria-labelledby="clusters-heading" className="cluster-status">
                         <h2 id="clusters-heading">Dengue clusters in this area</h2>
                         {clusters.length === 0 ? (

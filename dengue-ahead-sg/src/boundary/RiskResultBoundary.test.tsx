@@ -17,8 +17,8 @@ import {
 
 const subzone = { subzoneId: 'SZ1', name: 'Bedok North' } as unknown as PlanningSubzone;
 
-function contribution(factorType: RiskFactorType, value: number, level: ContributionLevel, explanation: string) {
-  return { factorType, inputValue: 1, contribution: value, contributionLevel: level, explanation };
+function contribution(factorType: RiskFactorType, value: number, level: ContributionLevel, explanation: string, inputValue = 1) {
+  return { factorType, inputValue, contribution: value, contributionLevel: level, explanation };
 }
 
 function makeAssessment(overrides: Partial<RiskAssessment> = {}): RiskAssessment {
@@ -27,9 +27,9 @@ function makeAssessment(overrides: Partial<RiskAssessment> = {}): RiskAssessment
     horizonDays: 14, dataConfidence: DataConfidence.Medium, assessmentType: AssessmentType.Baseline,
     generatedAt: '2026-10-28T01:00:00.000Z', dataTimeStamp: '2026-10-28T00:00:00.000Z',
     contributions: [
-      contribution(RiskFactorType.Humidity, 10, ContributionLevel.Low, 'Humidity 80% scores 40/100'),
-      contribution(RiskFactorType.DengueClusters, 40, ContributionLevel.High, '5 cluster cases nearby'),
-      contribution(RiskFactorType.PopulationDensity, 15, ContributionLevel.Moderate, '9000 residents/km2'),
+      contribution(RiskFactorType.Humidity, 10, ContributionLevel.Low, 'Humidity 80% scores 40/100', 80),
+      contribution(RiskFactorType.DengueClusters, 40, ContributionLevel.High, '5 cluster cases nearby', 5),
+      contribution(RiskFactorType.PopulationDensity, 15, ContributionLevel.Moderate, '9000 residents/km2', 9000),
     ],
     ...overrides,
   } as RiskAssessment;
@@ -93,8 +93,9 @@ describe('RiskResultBoundary (ticket 18)', () => {
     await renderResult();
     const items = factorItems();
     expect(items).toHaveLength(3);
-    expect(items[0].textContent).toContain('Dengue clusters nearby');
+    expect(items[0].textContent).toContain('Nearby clusters');
     expect(items[0].textContent).toContain('5 cluster cases nearby');
+    expect(items[0].textContent).toContain('Adds 40.0 points');
     expect(items[1].textContent).toContain('Population density');
     expect(items[2].textContent).toContain('Humidity');
   });
@@ -102,12 +103,12 @@ describe('RiskResultBoundary (ticket 18)', () => {
   it('shows only the contributions it is given (no hardcoded list)', async () => {
     await renderResult({
       assessment: makeAssessment({
-        contributions: [contribution(RiskFactorType.LaggedRainfall, 22.46, ContributionLevel.Moderate, 'Rainfall 200 mm')],
+        contributions: [contribution(RiskFactorType.LaggedRainfall, 22.46, ContributionLevel.Moderate, 'Rainfall 200 mm', 200)],
       }),
     });
     expect(factorItems()).toHaveLength(1);
     expect(factorItems()[0].textContent).toContain('22.5 points');
-    expect(container.textContent).not.toContain('Dengue clusters nearby');
+    expect(container.textContent).not.toContain('Nearby clusters');
   });
 
   it('says so when there are no contributions', async () => {
@@ -194,5 +195,11 @@ describe('RiskResultBoundary (ticket 18)', () => {
     expect(container.textContent).toContain('7 cases in total');
     await renderResult({ clusters: undefined });
     expect(container.querySelector('#clusters-heading')).toBeNull();
+  });
+
+  it('leaves cluster information to the map when embedded in the dashboard', async () => {
+    await renderResult({ embedded: true, clusters: [{ clusterId: 'c1', caseCount: 20 }] as DengueCluster[] });
+    expect(container.querySelector('#clusters-heading')).toBeNull();
+    expect(container.querySelector('#tips-heading')).not.toBeNull();
   });
 });
