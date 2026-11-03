@@ -12,7 +12,9 @@ export const FACTOR_RANK: Record<RiskFactorType, number> = {
 
 export const CORE_FACTORS: readonly RiskFactorType[] = [RiskFactorType.DengueClusters];
 
-export const MAX_FETCH_AGE_MIN = { clusters: 120, aedes: 120 } as const;
+// Hourly data counts as stale after 3 hours: one late or dropped GitHub run is normal,
+// two in a row is worth warning about.
+export const MAX_FETCH_AGE_MIN = { clusters: 180, aedes: 180 } as const;
 export const MAX_AEDES_DATE_AGE_DAYS = 45;
 export const MAX_MONTHLY_LAG_MONTHS = 2;
 

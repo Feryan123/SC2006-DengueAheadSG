@@ -2,9 +2,11 @@ name: Hourly data sync
 
 on:
   schedule:
-    - cron: '0 * * * *'      # every hour, UTC
+    # Every hour at :17 UTC. GitHub delays or drops scheduled runs at :00, its busiest minute,
+    # so the run is kept off the hour. A late or dropped run is covered by MAX_FETCH_AGE_MIN.
+    - cron: '17 * * * *'
   workflow_dispatch:         # manual "Run workflow" button
-      
+
 concurrency: sync-data       # never run two syncs at the same time
 
 permissions:
@@ -13,6 +15,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 15        # a stuck run must not block the next hour's run (concurrency)
     defaults:
       run:
         working-directory: dengue-ahead-sg
