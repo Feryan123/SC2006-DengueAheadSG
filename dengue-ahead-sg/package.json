@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "sync": "tsx --env-file-if-exists=.env scripts/sync-data.ts",
-    "build-static": "tsx scripts/build-static.ts"
+    "build-static": "tsx scripts/build-static.ts",
+    "sensitivity": "tsx scripts/sensitivity-analysis.ts"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.22",

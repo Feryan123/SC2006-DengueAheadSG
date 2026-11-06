@@ -36,12 +36,13 @@ export class RiskAssessmentControl implements MapAssessmentControl {
   readonly calculators: RiskFactorCalculator[];
   readonly weights: Record<RiskFactorType, number>;
 
+  /** `weights` defaults to the rank-sum weights; other weights are only used by the sensitivity analysis (Ticket 35). */
   constructor(calculators: RiskFactorCalculator[] = [
     new DengueClusterCalculator(), new HighAedesAreaCalculator(), new PopulationDensityCalculator(),
     new HumidityCalculator(), new LaggedRainfallCalculator(),
-  ]) {
+  ], weights: Record<RiskFactorType, number> = rankSumWeights(FACTOR_RANK)) {
     this.calculators = calculators;
-    this.weights = rankSumWeights(FACTOR_RANK);
+    this.weights = weights;
   }
 
   async generateAssessment(
