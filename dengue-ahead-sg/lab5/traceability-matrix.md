@@ -3,8 +3,8 @@
 **Author:** Huajia (P5)  
 **Ticket:** #26 — Traceability Matrix Started  
 **Sprint:** Sprint 1 (22–28 October 2026)  
-**Last updated:** 28 October 2026  
-**Status:** Initial draft — revised following peer review
+**Last updated:** 7 November 2026  
+**Status:** Sprint 1 baseline with final Lab 4 test-ID traceability update (Ticket #26)
 
 ## 1. Purpose
 
@@ -20,6 +20,8 @@ This is a living document. An existing class, method or test file does not autom
 - Ticket #25 — `docs/black-box-test-design.md`
 - Lab 5, Section 3.1.6 — Demonstrating traceability
 - Reviewer feedback on Ticket #26
+- Ticket #41 — final black-box and white-box test case inventory (`testing-section-plan.md`)
+- PR #51 — GitHub Actions Vitest execution (36 files / 446 tests passed)
 
 ### Status Legend
 
@@ -33,45 +35,44 @@ This is a living document. An existing class, method or test file does not autom
 
 | FR | UC | Dialog State / Interaction | Class.method | Test ID / File | Status |
 |---|---|---|---|---|---|
-| FR-1.1–FR-1.4 | UC-1 Assess Location Risk | Home / Location Input | `LocationRiskControl.assessLocation()` | Pending dedicated location-flow test | Pending — stub throws `Not implemented` |
-| FR-1.2–FR-1.4 | UC-5 Identify Planning Subzone | Location Input → Location Confirmation / correction | `LocationRiskControl.identifyPlanningSubzone()` | `SubzoneBoundaryService.test.ts` (related) | Pending — method currently returns `null` |
-| FR-1.2–FR-1.4 | UC-5.1 / UC-5.2 | Location validation / subzone resolution | `LocationRiskControl.identifyPlanningSubzone()`; OneMap and boundary services | `SubzoneBoundaryService.test.ts`; `onemap-search.test.ts` | Partial supporting tests; control integration pending |
-| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result | `RiskAssessmentControl.generateAssessment()`; `determineDataConfidence()` | ECP-05–ECP-12; `RiskAssessmentControl.test.ts` | Existing; related tests present |
-| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result — factor contributions | `RiskAssessmentControl.calculateContributions()`; five factor calculators | ECP-09–ECP-10; `exposureCalculators.test.ts`; `weatherCalculators.test.ts` | Existing; related tests present |
-| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result — risk index and level | `RiskAssessmentControl.calculateRiskIndex()`; `determineRiskLevel()` | ECP-01–ECP-04; ECP-13–ECP-15; BVA-01–BVA-06; BVA-11–BVA-12; `RiskAssessmentControl.test.ts` | Existing; some ECP inputs are design-only |
-| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result — contribution levels | `RiskAssessmentControl.determineContributionLevel()` | BVA-07–BVA-10; BVA-13–BVA-14; `RiskAssessmentControl.test.ts` | Existing; parameterized tests present |
-| FR-1.1, FR-3.1–FR-3.4 | UC-2 Explore Risk Map | Risk Map / legend | `RiskMapControl.loadRiskMap()` | `RiskMapControl.test.ts`; `RiskMapBoundary.test.tsx` | Existing; related tests present |
-| FR-3.1–FR-3.4 | UC-2.2 Search Planning Subzone | Risk Map — search / selection | `RiskMapControl.selectSubzone()`; `getSelectedAssessment()` | `RiskMapControl.test.ts` | Existing; exact coverage to verify |
-| FR-3.1–FR-3.4 | UC-2 Explore Risk Map | Risk Map — selected subzone details | `RiskMapControl.getTopFactors()`; `getTopSubzones()` | `RiskMapControl.test.ts`; `RiskMapBoundary.test.tsx` | Existing; exact coverage to verify |
-| FR-3.1–FR-3.4 | UC-2.3 / UC-2.4 Overlay Toggles | Risk Map — overlay toggled | `RiskMapControl.updateOverlay()`; `RiskMapBoundary.tsx` | `RiskMapControl.test.ts`; `RiskMapBoundary.test.tsx` | Related methods/tests exist; final integration to verify |
-| FR-1.1, FR-4.1 | UC-3 View Prevention Guidance | Prevention Checklist | `PreventionGuidanceControl.loadChecklist()` | Pending dedicated test | Pending — stub throws `Not implemented` |
-| FR-4.1 | UC-3.1 View Task Details & Source Info | Task Selected / Task Details | `PreventionGuidanceControl.showTaskDetails()` | Pending dedicated test | Pending — implementation incomplete |
-| FR-5.1–FR-5.10 | UC-4 Simulate Risk Scenario | Simulation Setup | `RiskSimulationControl.validateAdjustment()` | Ticket #23 tests / merge to verify | Pending verification of merged implementation |
-| FR-5.1–FR-5.10 | UC-4.1 Recalculate & Compare | Simulation Comparison | `RiskSimulationControl.recalculateScenario()` | Ticket #23 tests / merge to verify | Pending verification of merged implementation |
-| FR-5.1–FR-5.10 | UC-4.2 Reset Factors | Simulation Setup / Reset | `RiskSimulationControl.resetScenario()` | Ticket #23 tests / merge to verify | Pending verification of merged implementation |
-| FR-1 / FR-2 / FR-3 (related) | UC-1 / UC-2 | Data Unavailable / error handling | `LocationRiskControl.handleUnavailableData()`; `RiskMapControl.handleUnavailableData()` | `RiskMapControl.test.ts` (related) | Location control pending — stub throws `Not implemented`; map handling requires separate verification |
+| FR-1.1–FR-1.4 | UC-1 Assess Location Risk | Home / Location Input | `LocationRiskControl.assessLocation()` | LOC-ECP-01–LOC-ECP-08; LOC-BVA-01–LOC-BVA-04 (location-flow cases) | Pending — stub throws `Not implemented` |
+| FR-1.2–FR-1.4 | UC-5 Identify Planning Subzone | Location Input → Location Confirmation / correction | `LocationRiskControl.identifyPlanningSubzone()` | LOC-ECP-01–LOC-ECP-08; `SubzoneBoundaryService.test.ts` (related) | Pending — method currently returns `null` |
+| FR-1.2–FR-1.4 | UC-5.1 / UC-5.2 | Location validation / subzone resolution | `LocationRiskControl.identifyPlanningSubzone()`; OneMap and boundary services | LOC-ECP-01–LOC-ECP-08; LOC-BVA-01–LOC-BVA-04; `SubzoneBoundaryService.test.ts`; `onemap-search.test.ts` | Partial supporting tests; control integration pending |
+| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result | `RiskAssessmentControl.generateAssessment()`; `determineDataConfidence()` | RA-ECP-10–RA-ECP-14; DC-P1–DC-P4; DC-X1; `RiskAssessmentControl.test.ts` | Existing; related tests present |
+| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result — factor contributions | `RiskAssessmentControl.calculateContributions()`; five factor calculators | RA-ECP-07–RA-ECP-09; RA-ECP-14; `exposureCalculators.test.ts`; `weatherCalculators.test.ts` | Existing; related tests present |
+| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result — risk index and level | `RiskAssessmentControl.calculateRiskIndex()`; `determineRiskLevel()` | RA-ECP-01–RA-ECP-09; RA-BVA-01–RA-BVA-08; `RiskAssessmentControl.test.ts` | Existing; some ECP inputs are design-only |
+| FR-2.1–FR-2.7 | UC-1.2 Generate Risk Assessment | Risk Result — contribution levels | `RiskAssessmentControl.determineContributionLevel()` | `RiskAssessmentControl.test.ts` (contribution-level cases; no dedicated final 98-case ID) | Existing; parameterized tests present |
+| FR-1.1, FR-3.1–FR-3.4 | UC-2 Explore Risk Map | Risk Map / legend | `RiskMapControl.loadRiskMap()` | MAP-ECP-01–MAP-ECP-03; `RiskMapControl.test.ts`; `RiskMapBoundary.test.tsx` | Existing; related tests present |
+| FR-3.1–FR-3.4 | UC-2.2 Search Planning Subzone | Risk Map — search / selection | `RiskMapControl.selectSubzone()`; `getSelectedAssessment()` | MAP-ECP-06; `RiskMapControl.test.ts` | Existing; exact coverage to verify |
+| FR-3.1–FR-3.4 | UC-2 Explore Risk Map | Risk Map — selected subzone details | `RiskMapControl.getTopFactors()`; `getTopSubzones()` | MAP-ECP-04–MAP-ECP-05; MAP-ECP-07; MAP-BVA-01–MAP-BVA-02; `RiskMapControl.test.ts`; `RiskMapBoundary.test.tsx` | Existing; exact coverage to verify |
+| FR-3.1–FR-3.4 | UC-2.3 / UC-2.4 Overlay Toggles | Risk Map — overlay toggled | `RiskMapControl.updateOverlay()`; `RiskMapBoundary.tsx` | MAP-ECP-08; `RiskMapControl.test.ts`; `RiskMapBoundary.test.tsx` | Related methods/tests exist; final integration to verify |
+| FR-1.1, FR-4.1 | UC-3 View Prevention Guidance | Prevention Checklist | `PreventionGuidanceControl.loadChecklist()` | PG-ECP-01–PG-ECP-02; `PreventionGuidanceControl` cases | Pending — stub throws `Not implemented` |
+| FR-4.1 | UC-3.1 View Task Details & Source Info | Task Selected / Task Details | `PreventionGuidanceControl.showTaskDetails()` | PG-ECP-03–PG-ECP-04; PG-BVA-01; `PreventionGuidanceControl` cases | Pending — implementation incomplete |
+| FR-5.1–FR-5.10 | UC-4 Simulate Risk Scenario | Simulation Setup | `RiskSimulationControl.validateAdjustment()` | SIM-ECP-01–SIM-ECP-08; SIM-BVA-01–SIM-BVA-09 | Pending verification of merged implementation |
+| FR-5.1–FR-5.10 | UC-4.1 Recalculate & Compare | Simulation Comparison | `RiskSimulationControl.recalculateScenario()` | SIM-REC-01–SIM-REC-04 | Pending verification of merged implementation |
+| FR-5.1–FR-5.10 | UC-4.2 Reset Factors | Simulation Setup / Reset | `RiskSimulationControl.resetScenario()` | RiskSimulationControl tests (resetScenario coverage to verify) | Pending verification of merged implementation |
+| FR-1 / FR-2 / FR-3 (related) | UC-1 / UC-2 | Data Unavailable / error handling | `LocationRiskControl.handleUnavailableData()`; `RiskMapControl.handleUnavailableData()` | LOC-ECP-05–LOC-ECP-08; MAP-ECP-02–MAP-ECP-03; `RiskMapControl.test.ts` (related) | Location control pending — stub throws `Not implemented`; map handling requires separate verification |
 
 **Dialog-state note:** State names above are working labels based on the use-case flows and current boundary components. They must be reconciled with the team's latest dialog map before final submission.
 
 **Requirement note:** The FR ranges are taken from the traceability notes in the latest use-case descriptions. Exact individual FR-to-method mappings must be checked against the final SRS.
 
-### 2.1 FR-2 Risk Assessment Test References
+### 2.1 Final Test IDs from Tickets #37 and #41
 
-Ticket #25 provides the following black-box test design IDs:
+The final Lab 4 case IDs use prefixes to distinguish them from the earlier Ticket #25 design IDs. The earlier unprefixed `ECP-xx` and `BVA-xx` identifiers are **not** interchangeable with `RA-ECP-xx` or `RA-BVA-xx`. The full test tables, expected outputs, recorded actual outputs and pass/fail results are maintained in the Lab 4 testing report.
 
-| Test IDs | Coverage Area | Implementation / Test Reference |
-|---|---|---|
-| ECP-01–ECP-04 | Valid risk classification classes | `determineRiskLevel()`; `RiskAssessmentControl.test.ts` |
-| ECP-05–ECP-08 | Assessment generation, unknown subzone and missing core data | `generateAssessment()`; `RiskAssessmentControl.test.ts` |
-| ECP-09–ECP-12 | Missing factors, confidence and stale datasets | `generateAssessment()`; `determineDataConfidence()`; `RiskAssessmentControl.test.ts` |
-| ECP-13–ECP-14 | Out-of-range classification inputs | `determineRiskLevel()`; documented design cases, not separately automated |
-| ECP-15 | Risk index clamping above 100 | `calculateRiskIndex()`; `RiskAssessmentControl.test.ts` |
-| BVA-01–BVA-06 | Risk level thresholds | `determineRiskLevel()`; parameterized tests |
-| BVA-07–BVA-10 | Contribution level thresholds | `determineContributionLevel()`; parameterized tests |
-| BVA-11–BVA-12 | Risk index range edges: 0 and 100 | `determineRiskLevel()`; parameterized tests |
-| BVA-13–BVA-14 | Factor score range edges: 0 and 100 | `determineContributionLevel()`; parameterized tests |
+| Area / traced UC | Final test IDs | Count | Coverage |
+|---|---|---:|---|
+| Risk assessment / UC-1, UC-1.2 | `RA-ECP-01`–`RA-ECP-14`; `RA-BVA-01`–`RA-BVA-08` | 22 | Risk classes, index bounds, calculation, assessment availability and missing factors |
+| Risk simulation / UC-4, UC-4.1, UC-4.2 | `SIM-ECP-01`–`SIM-ECP-08`; `SIM-BVA-01`–`SIM-BVA-09`; `SIM-CLAMP-01`–`SIM-CLAMP-04`; `SIM-REC-01`–`SIM-REC-04` | 25 | Adjustment validation, input limits, clamping, recalculation and immutability |
+| Location / UC-1, UC-5 | `LOC-ECP-01`–`LOC-ECP-08`; `LOC-BVA-01`–`LOC-BVA-04` | 12 | Postal/address search, invalid/outside locations, unavailable data and input length |
+| Risk map / UC-2 | `MAP-ECP-01`–`MAP-ECP-08`; `MAP-BVA-01`–`MAP-BVA-02` | 10 | Map load, empty data, selection, top-10 ranking, factors and overlay |
+| Prevention guidance / UC-3 | `PG-ECP-01`–`PG-ECP-04`; `PG-BVA-01` | 5 | Checklist and task detail retrieval |
+| Data confidence white-box / UC-1.2 | `DC-P1`–`DC-P4`; `DC-X1` | 5 | Missing/stale dataset decisions and confidence outcomes |
+| Personalised tips white-box / UC-1 (related guidance) | `GT-P1`–`GT-P10`; `GT-X1`–`GT-X5`; `GT-LVL-LOW`; `GT-LVL-MODERATE`; `GT-LVL-HIGH`; `GT-LVL-VERY_HIGH` | 19 | Basis paths, deduplication, factor selection and risk-level cases |
+| **Total** | | **98** | **98 documented designed cases** |
 
-**Coverage note:** These IDs refer to test design cases, not necessarily individual automated test names. The detailed Test ID-to-test-name mapping is maintained in Ticket #25. The exact inputs for ECP-01, ECP-02 and ECP-04 are not separately automated.
+**Traceability note:** These are case IDs from the Lab 4 test report, not a one-to-one list of Vitest test names. The 446 automated tests are a separate suite. For the original Ticket #25 black-box design IDs (`ECP-01`–`ECP-15`, `BVA-01`–`BVA-14`), refer to `docs/black-box-test-design.md`; this revision uses the final Lab 4 IDs for Ticket #41 traceability. The 98 recorded case results should be independently checked before final sign-off.
 
 ### 2.2 Risk Factor Calculators and Supporting Tests
 
@@ -118,7 +119,7 @@ Every Sprint 1 backlog item is recorded below, including user stories, supportin
 | #23 | RiskSimulationControl | UC-4 / FR-5 | `RiskSimulationControl.ts` | PR under review; merged implementation to verify |
 | #24 | SimulationBoundary update | UC-4 / FR-5 | `SimulationBoundary.tsx` | Pending verification |
 | #25 | Black-box test design | UC-1 / FR-2 | `docs/black-box-test-design.md` | PR #22 updated; under review |
-| #26 | Traceability matrix | UC-1–UC-5 | `lab5/traceability-matrix.md` | In review — changes requested |
+| #26 | Traceability matrix | UC-1–UC-5 | `lab5/traceability-matrix.md` | Sprint 1 baseline merged; final test-ID update awaiting review |
 | #27 | Integration and internal demo | UC-1–UC-4 | Integrated application and demo evidence | Pending |
 | #28 | Sprint review and retrospective | Cross-cutting | Notion meeting notes | Pending |
 | #53 | Architecture diagram draft | Public Data / cross-cutting | Architecture diagram | Review pending |
@@ -164,11 +165,27 @@ All 31 Sprint 1 backlog items are represented in the coverage table. The final r
 
 ### 4.2 Additional Testing Records to Reconcile
 
-The reviewer identified test documentation associated with Tickets #13, #19, #20, #22 and #55 under `testing/tests/`.
+The reviewer confirmed that `testing/tests/` exists at the repository root, not inside `dengue-ahead-sg/`.
 
-However, the `testing/tests/` directory was not found in the reviewed Ticket #26 branch, and no files under that path appeared in the tracked-file listing.
+The following test records are available: `testing/tests/ticket-13.md`, `testing/tests/ticket-19.md`, `testing/tests/ticket-20.md`, `testing/tests/ticket-22.md`, and `testing/tests/ticket-55.md`.
 
-These records should be linked when their exact paths and merge status are confirmed. They are not presented here as verified local files.
+These records provide additional supporting test documentation. Their exact coverage and relationship to the final Lab 4 test IDs should be verified separately.
+
+### 4.3 Ticket #41 — Final Automated Test Execution
+
+| Field | Recorded result |
+|---|---|
+| Date | 7 November 2026 (Singapore time; GitHub run on 6 November UTC) |
+| Test command | `npm test -- --reporter=verbose` (Vitest) |
+| Execution platform | GitHub Actions, PR #51 (`test/vitest-ticket-41`) |
+| Test files | **36 passed / 36** |
+| Automated tests | **446 passed / 446; 0 failed** |
+| Vitest duration | **29.99 seconds** |
+| Workflow | `Run Vitest Tests` — successful |
+| Review / merge | PR #51 approved and merged into `master` (merge commit `0be82fa`) |
+| Additional verification | Reviewer reported 446/446 passing on a clean copy of `master` |
+
+**Evidence:** [PR #51](https://github.com/Feryan123/SC2006-DengueAheadSG/pull/51) and its GitHub Actions run logs. The PR workflow execution occurred before merge; the separate clean-`master` verification is supported by the reviewer comment. This automated result is distinct from the 98 documented Lab 4 manual/design cases.
 
 ## 5. Known Gaps and Follow-up Actions
 
@@ -177,7 +194,7 @@ These records should be linked when their exact paths and merge status are confi
 3. **Location control:** `assessLocation()` and `handleUnavailableData()` are stubs; `identifyPlanningSubzone()` currently returns `null`. Recheck after Ticket #14 merges.
 4. **Prevention guidance:** `loadChecklist()` and `showTaskDetails()` remain pending implementation.
 5. **Simulation:** Recheck Ticket #23's implementation and automated tests after its PR merges; update Ticket #24 integration status separately.
-6. **Test coverage:** Ticket #25 IDs now provide more detailed FR-2 traceability. Some ECP cases remain design-only. Additional test records under `testing/tests/` still need to be located and linked.
+6. **Test coverage:** Final Lab 4 test IDs from Tickets #37/#41 are mapped in Sections 2 and 2.1; confirm actual-output evidence for each of the 98 cases before final sign-off. Automated Vitest execution is separately recorded in Section 4.3.
 7. **Public data:** Data retrieval and refresh support UC-1 and UC-2 rather than forming a separately numbered use case in the current UC-1–UC-5 descriptions.
 8. **Prevention scope:** UC-3 describes a public bundled prevention checklist. Personalised tips in Ticket #17 must be traced separately.
 9. **Pending PRs:** Recheck after Ticket #9, #14, #21, #23 and #25 changes merge into `master`.
@@ -205,11 +222,13 @@ Demonstrate selecting a subzone and, once the overlay feature is merged, togglin
 - [x] Author identified.
 - [x] Existing calculator tests and DataGovSgAdapter recorded.
 - [x] Pending location and prevention stubs identified.
-- [x] Ticket #25 ECP/BVA test IDs linked to FR-2.
+- [x] Final Ticket #37/#41 test IDs mapped to relevant FR/UC rows and documented in Section 2.1.
+- [x] No UC-6 rows included.
+- [x] Ticket #41 Vitest execution recorded: 36 files, 446 tests passed (PR #51).
 - [ ] Exact dialog-state names checked against final dialog map.
-- [ ] Additional `testing/tests/` records linked after their paths are confirmed.
-- [ ] Reviewed and accepted by at least one other team member.
+- [x] Additional `testing/tests/` records linked in Section 4.2.
+- [ ] This final Test ID update reviewed and accepted by at least one other team member.
 - [ ] Common documentation folder agreed with the team.
 - [ ] Product Owner acceptance and sign-off obtained.
 
-**Important:** This is an initial traceability matrix, not a declaration that every use case or Sprint 1 story is finished.
+**Important:** Sprint 1 implementation statuses above are a historical baseline from 28 October 2026 and have not been re-audited against the latest master. The final test-ID mapping and Vitest execution evidence were updated on 7 November 2026. Neither test-file existence nor a passing automated suite alone proves every use case is fully implemented.
