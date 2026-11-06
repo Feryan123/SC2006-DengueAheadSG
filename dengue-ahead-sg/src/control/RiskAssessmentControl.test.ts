@@ -215,3 +215,22 @@ describe('assessAll', () => {
         expect(await control.assessAll(makeSnapshot(DatasetStatus.Failed))).toEqual([]);
     });
 });
+
+describe('custom weights (Ticket 35 sensitivity analysis)', () => {
+    const scores = {
+        [RiskFactorType.DengueClusters]: 80, [RiskFactorType.HighAedesArea]: 60, [RiskFactorType.PopulationDensity]: 40,
+        [RiskFactorType.Humidity]: 30, [RiskFactorType.LaggedRainfall]: 20,
+    };
+    const calculators = () => Object.values(RiskFactorType).map(f => fake(f, scores[f]));
+
+    it('uses rank-sum weights by default (80, 60, 40, 30, 20 → 56)', async () => {
+        const a = await new RiskAssessmentControl(calculators()).generateAssessment('A', makeSnapshot());
+        expect(a?.riskIndex).toBe(56);
+    });
+
+    it('uses supplied weights instead: equal weights give the plain average (46)', async () => {
+        const equal = Object.fromEntries(Object.values(RiskFactorType).map(f => [f, 0.2])) as Record<RiskFactorType, number>;
+        const a = await new RiskAssessmentControl(calculators(), equal).generateAssessment('A', makeSnapshot());
+        expect(a?.riskIndex).toBe(46);
+    });
+});
