@@ -39,6 +39,7 @@ The application is a single dashboard. The dialog states are those of the team's
 | Dashboard — Invalid Location | Messages (location error) |
 | Risk Assessment Unavailable | Messages (data unavailable) |
 | Risk Map Unavailable | Messages (data unavailable) |
+| Dashboard — Data Out of Date | Messages (stale-data or backup-data notice with the data time) |
 | Full NEA Checklist — Expanded | Prevention Guidance (full checklist) |
 | Simulate Risk Scenario — Setup | Simulate Risk Panel |
 | Simulate Risk Scenario — Comparison | Simulate Risk Panel |
@@ -56,7 +57,7 @@ All paths are relative to `dengue-ahead-sg/` unless stated otherwise.
 |---|---|---|---|---|---|
 | FR-1.1, FR-1.2 | UC-1 | Dashboard — No Area Selected → Dashboard — Area Selected *(searchOrSelectArea)* / Dashboard — Invalid Location *(submitQuery [invalid location])* | `LocationRiskControl.assessLocation()` | LOC-ECP-01–LOC-ECP-04; LOC-BVA-01–LOC-BVA-04; `src/control/LocationRiskControl.test.ts` | Implemented; tested |
 | FR-5.1 | UC-5 | Dashboard — No Area Selected → Dashboard — Area Selected *(searchOrSelectArea)* | `RiskMapBoundary` search (subzone-name match before geocoding) | `src/App.test.tsx` ("searches local subzone names without calling the address service"); `testing/tests/ui-dashboard.md` | Implemented; tested |
-| FR-5.2, FR-5.3, FR-5.6 | UC-5 (UC-5.1) | Dashboard — No Area Selected → Dashboard — Area Selected / Dashboard — Invalid Location (search service unavailable: see Section 5, item 8) | `GeocodingMapServiceBoundary.geocodeLocation()`; `api/onemap-search.ts` | LOC-ECP-05; `tests/onemap-search.test.ts` | Implemented; tested |
+| FR-5.2, FR-5.3, FR-5.6 | UC-5 (UC-5.1) | Dashboard — No Area Selected → Dashboard — Area Selected / Dashboard — Invalid Location *(submitQuery [search unavailable])* | `GeocodingMapServiceBoundary.geocodeLocation()`; `api/onemap-search.ts` | LOC-ECP-05; `tests/onemap-search.test.ts` | Implemented; tested |
 | FR-5.4, FR-5.5 | UC-5 (UC-5.2) | Dashboard — No Area Selected → Dashboard — Area Selected / Dashboard — Invalid Location | `LocationRiskControl.identifyPlanningSubzone()` | LOC-ECP-01–LOC-ECP-04; LOC-ECP-06; `src/control/LocationRiskControl.test.ts`; `src/services/SubzoneBoundaryService.test.ts` | Implemented; tested |
 | FR-1.3, FR-1.8, FR-1.9 | UC-1 (UC-1.2) | Dashboard — Area Selected; Risk Assessment Unavailable *(selectArea [assessment unavailable])* | `RiskAssessmentControl.generateAssessment()`; `determineDataConfidence()` | RA-ECP-10–RA-ECP-13; DC-P1–DC-P4; DC-X1; DC-X2; `src/control/RiskAssessmentControl.test.ts` | Implemented; tested (DC-X2: known limitation) |
 | FR-1.4, FR-1.7 | UC-1 (UC-1.2) | Dashboard — Area Selected (factor breakdown) | `RiskAssessmentControl.calculateContributions()`; the five `RiskFactorCalculator` classes | RA-ECP-14; FM-RW-01–FM-RW-08; `src/control/calculators/exposureCalculators.test.ts`; `src/control/calculators/weatherCalculators.test.ts` | Implemented; tested |
@@ -97,8 +98,8 @@ All paths are relative to `dengue-ahead-sg/` unless stated otherwise.
 
 | NFR | Supports | Dialog state | Class / file | Test ID / File | Status |
 |---|---|---|---|---|---|
-| NFR-REL.1, NFR-REL.2 | UC-1, UC-2 | Dashboard — No Area Selected; Dashboard — Area Selected (backup notice; see Section 5, item 7) | `CachedPublicDataServiceProxy`; `BundledFallbackNotice`; `Startup.ts` | FM-E2E-01–FM-E2E-03; FM-REC-01; FM-VAL-01–FM-VAL-02; `src/services/CachedPublicDataServiceProxy.test.ts`; `src/services/dataPipelineFailureModes.test.ts`; `src/Startup.fallback.test.tsx`; `testing/tests/ticket-13.md`, `ticket-58.md` | Implemented; tested |
-| NFR-FRS.2, NFR-SAF.2 | UC-1, UC-2 | Dashboard — No Area Selected; Dashboard — Area Selected (stale-data notice; see Section 5, item 7) | `dataFreshness.ts`; `DataFreshnessNotice` | `src/control/dataFreshness.test.ts`; `src/boundary/DataFreshnessNotice.test.tsx` | Implemented; tested (45-day Aedes rule: known limitation) |
+| NFR-REL.1, NFR-REL.2 | UC-1, UC-2 | Dashboard — Data Out of Date *(loadData [stale or backup data])* (backup notice); Dashboard — Area Selected | `CachedPublicDataServiceProxy`; `BundledFallbackNotice`; `Startup.ts` | FM-E2E-01–FM-E2E-03; FM-REC-01; FM-VAL-01–FM-VAL-02; `src/services/CachedPublicDataServiceProxy.test.ts`; `src/services/dataPipelineFailureModes.test.ts`; `src/Startup.fallback.test.tsx`; `testing/tests/ticket-13.md`, `ticket-58.md` | Implemented; tested |
+| NFR-FRS.2, NFR-SAF.2 | UC-1, UC-2 | Dashboard — Data Out of Date *(loadData [stale or backup data])*; Dashboard — Area Selected (stale-data notice) | `dataFreshness.ts`; `DataFreshnessNotice` | `src/control/dataFreshness.test.ts`; `src/boundary/DataFreshnessNotice.test.tsx` | Implemented; tested (45-day Aedes rule: known limitation) |
 | NFR-FRS.1, NFR-FRS.4 | UC-1, UC-2 | — | `.github/workflows/sync-data.yml`; `scripts/sync-data.ts` | `scripts/sync-data.test.ts` | Implemented; tested (schedule reliability: known limitation) |
 | NFR-SEC.3 | UC-1, UC-5 | — | `api/snapshot.ts`; `api/onemap-search.ts` | `tests/snapshot.test.ts`; `tests/onemap-search.test.ts`; `testing/tests/ticket-55.md` | Implemented; tested |
 | NFR-ACC.1, NFR-USA.2 | All UCs | All states | Boundary components; `style.css` | `testing/tests/ticket-32.md`; `testing/tests/ui-dashboard.md` | Implemented; manual check |
@@ -238,8 +239,6 @@ These were found by testing and are recorded rather than fixed, because the code
 4. **NFR-FRS.2:** the 45-day high-Aedes age rule is defined in `riskModelConfig.ts` but not applied.
 5. **NFR-FRS.1:** GitHub Actions does not always start the hourly run on time; the refresh can be triggered by hand (NFR-FRS.4).
 6. **Top-10 list:** the highest-risk list (`getTopSubzones()`) has no FR of its own in the SRS.
-7. **Dialog map — stale or backup data:** the app shows a stale-data notice and a backup-data notice (NFR-FRS.2, NFR-SAF.2, NFR-REL.2) inside the dashboard states, but the dialog map has no separate state or activity for them.
-8. **Dialog map — search service unavailable:** when OneMap cannot be reached, the app shows "Location search is unavailable" (FR-5.6). The dialog map does not show this separately from Dashboard — Invalid Location.
 
 ## 6. Lab 5 Demonstration Trace Examples
 
