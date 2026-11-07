@@ -169,8 +169,9 @@ turned into weights with the **rank-sum** method. All settings live in `src/cont
   `RiskAssessmentControl`.
 - Data counts as stale when a dataset is `STALE` or `FAILED`, or when hourly data was fetched more than 3 hours ago.
 
-How robust the weights are is analysed in [`../lab4/sensitivity-analysis.md`](../lab4/sensitivity-analysis.md)
-(reproduce with `npm run sensitivity`).
+The full specification, with the reasons and sources for each choice, excluded factors and limitations, is in
+[`../lab4/risk-model-spec.md`](../lab4/risk-model-spec.md) (#42). How robust the weights are is analysed in
+[`../lab4/sensitivity-analysis.md`](../lab4/sensitivity-analysis.md) (reproduce with `npm run sensitivity`).
 
 ## OneMap search proxy
 
@@ -407,6 +408,7 @@ full suite on GitHub Actions (`.github/workflows/run-tests.yml`, Node 22).
 | [`../lab4/testing/`](../lab4/testing/) | Lab 4 black-box and white-box test design, and the pipeline failure-mode tests (#34) |
 | [`docs/black-box-test-design.md`](docs/black-box-test-design.md) | Black-box test design for `RiskAssessmentControl` (#25) |
 | [`lab5/traceability-matrix.md`](lab5/traceability-matrix.md) | Requirements → use cases → methods → tests |
+| [`../lab4/risk-model-spec.md`](../lab4/risk-model-spec.md) | Risk model specification: factors, weights, scoring, sources (#42) |
 | [`../lab4/sensitivity-analysis.md`](../lab4/sensitivity-analysis.md) | Risk-weight sensitivity analysis (#35) |
 
 ## Conventions
