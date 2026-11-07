@@ -4,6 +4,13 @@ A website to check dengue clusters and how risky an area is, as an extra precaut
 
 > Not an official NEA forecast or medical advice.
 
+**Live site:** https://dengue-ahead-sg-three.vercel.app
+
+**Where the code lives.** The team developed in a private repository (`Feryan123/SC2006-DengueAheadSG`), which also runs
+the hourly data pipeline and the live site. For assessment, a ZIP of its `master` branch is submitted to the course
+repository [`softwarelab3/2006-SCSC-F5`](https://github.com/softwarelab3/2006-SCSC-F5). Links in these documents that
+point to the team repository (pull requests, the `data` branch) need access to it.
+
 ## What it does
 
 - **Risk map** of all Singapore planning subzones coloured by a four-level dengue risk index (Low to Very High).
@@ -33,9 +40,10 @@ Please use **npm** (not yarn/pnpm) so everyone shares the same `package-lock.jso
 
 ## Getting started
 
+Unzip the submitted `SC2006-DengueAheadSG-master.zip` (or clone the team repository if you have access), then:
+
 ```bash
-git clone https://github.com/Feryan123/SC2006-DengueAheadSG.git
-cd SC2006-DengueAheadSG/dengue-ahead-sg   # the app lives in this subfolder
+cd SC2006-DengueAheadSG-master/dengue-ahead-sg   # the app lives in this subfolder
 npm install
 npm run dev                               # open the URL it prints (usually http://localhost:5173)
 ```
@@ -113,7 +121,7 @@ public frontend. `.env*` files are ignored by Git (except `.env.example`).
 ```
 
 - The hourly GitHub Action downloads public datasets, joins them to subzones and publishes one validated snapshot to the private `data` branch.
-- `api/snapshot.ts` serves that snapshot to the browser, because the repository is private.
+- `api/snapshot.ts` serves that snapshot to the browser, because the team repository is private.
 - In the browser, `CachedPublicDataServiceProxy` caches it and falls back to the bundled copy if everything else fails.
 - The controls calculate risk from the snapshot; the boundaries (React components) display it.
 
@@ -261,7 +269,7 @@ current source commit and the refresh steps.
 
 ### Snapshot hosting
 
-The repository is private, so the browser cannot download the snapshot from the `data` branch directly.
+The team repository is private, so the browser cannot download the snapshot from its `data` branch directly.
 `api/snapshot.ts` is a server-only Vercel function that reads `dengue-ahead-sg/data/derived/latest-snapshot.json` from the
 `data` branch through the GitHub API and returns it as compact JSON (the committed file is pretty-printed and larger than
 a function response may be).
@@ -342,7 +350,7 @@ Local check record and diagram follow-ups: [dashboard UI/UX](testing/tests/ui-da
 ## Project structure
 
 ```
-SC2006-DengueAheadSG/
+SC2006-DengueAheadSG/        (SC2006-DengueAheadSG-master/ in the submitted ZIP)
 ├── README.md                this file
 ├── .github/workflows/       hourly data sync, tests on every pull request
 ├── dengue-ahead-sg/         the website (below)
