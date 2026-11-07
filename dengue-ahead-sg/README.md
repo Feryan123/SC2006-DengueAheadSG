@@ -6,12 +6,12 @@ A website to check dengue clusters and how risky an area is, as an extra precaut
 
 ## What it does
 
-- **Risk map** of all Singapore planning subzones, coloured by a four-level dengue risk index (Low to Very High).
+- **Risk map** of all Singapore planning subzones coloured by a four-level dengue risk index (Low to Very High).
 - **Search** by subzone name, postal code or address; the app finds the planning subzone and shows its risk.
 - **Score breakdown** showing how the five risk factors contribute to the selected area's index.
-- **Prevention guidance**: personalised tips for the selected area, plus the full NEA prevention checklist.
+- **Prevention guidance**: personalised tips for the selected area plus the full NEA prevention checklist.
 - **Simulate risk**: adjust humidity, past rainfall and high-Aedes overlap to see how the risk band would change.
-- **Data freshness warnings** when public data is stale, and a bundled backup when live data cannot be loaded.
+- **Data freshness warnings** when public data is stale and a bundled backup when live data cannot be loaded.
 
 ## Tech stack
 
@@ -81,22 +81,35 @@ Vite does not run the Vercel functions in `api/`, so two things work differently
 public frontend. `.env*` files are ignored by Git (except `.env.example`).
 
 ## How the pieces fit together
+ data.gov.sg datasets
+          |
+          v
+ GitHub Action, hourly (npm run sync)
+          |   publishes one validated snapshot
+          v
+ `data` branch (latest-snapshot.json)
+          |
+          v
+ /api/snapshot (Vercel function)
+          |
+          v
+ Browser: CachedPublicDataServiceProxy  --->  controls  --->  boundaries
+          |                  |
+          |                  +-- localStorage cache (1 hour)
+          +-- bundled backup snapshot (last resort)
 
-```
-data.gov.sg ──► GitHub Action (hourly) ──► `data` branch ──► /api/snapshot ──► browser
- datasets        npm run sync               latest-snapshot.json   (Vercel function)    │
-                                                                                         ▼
-                                              localStorage cache ◄── CachedPublicDataServiceProxy ──► controls ──► boundaries
-                                              bundled backup (last resort)
 
-address / postal code ──► /api/onemap-search (Vercel function, holds the OneMap login) ──► OneMap
-```
-
-1. The hourly **GitHub Action** downloads public datasets, joins them to subzones and publishes one validated snapshot to
-   the private `data` branch.
-2. `api/snapshot.ts` serves that snapshot to the browser, because the repository is private.
-3. In the browser, `CachedPublicDataServiceProxy` caches it, and falls back to the bundled copy if everything else fails.
-4. The controls calculate risk from the snapshot; the boundaries (React components) display it.
+ Address / postal code
+          |
+          v
+ /api/onemap-search (Vercel function, holds the OneMap login)
+          |
+          v
+ OneMap
+The hourly GitHub Action downloads public datasets, joins them to subzones and publishes one validated snapshot to the private data branch.
+api/snapshot.ts serves that snapshot to the browser because the repository is private.
+In the browser, CachedPublicDataServiceProxy caches it and falls back to the bundled copy if everything else fails.
+The controls calculate risk from the snapshot; the boundaries (React components) display it.
 
 ## Data pipeline
 
@@ -421,5 +434,11 @@ full suite on GitHub Actions (`.github/workflows/run-tests.yml`, Node 22).
 - Prevention guidance: [NEA](https://www.nea.gov.sg/dengue-zika/prevent-aedes-mosquito-breeding).
 
 ## Reference
+(https://docs.google.com/document/d/1p54W_7tYFbcrcK1JOqbXpyvwVqKzi7mM7uej5McBVsg/edit?usp=sharing)
+The design documents are kept in the team's private Google Doc: DengueAheadSG design document. It holds:
 
-- Class diagram, use case diagram and UI flow: `Sys Architecture.pdf` (team drive) / Lucidchart link inside it.
+Use case diagram and use case descriptions (UC-1 to UC-5 and their sub-use cases)
+Class diagram
+System architecture diagram
+UI flow
+Control flow graphs: risk level, data confidence and personalised tips
