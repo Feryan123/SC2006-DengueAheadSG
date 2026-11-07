@@ -81,13 +81,15 @@ Vite does not run the Vercel functions in `api/`, so two things work differently
 public frontend. `.env*` files are ignored by Git (except `.env.example`).
 
 ## How data flows through the website
+
+```
  data.gov.sg datasets
           |
           v
  GitHub Action, hourly (npm run sync)
           |   publishes one validated snapshot
           v
- `data` branch (latest-snapshot.json)
+ data branch (latest-snapshot.json)
           |
           v
  /api/snapshot (Vercel function)
@@ -106,10 +108,12 @@ public frontend. `.env*` files are ignored by Git (except `.env.example`).
           |
           v
  OneMap
-The hourly GitHub Action downloads public datasets, joins them to subzones and publishes one validated snapshot to the private data branch.
-api/snapshot.ts serves that snapshot to the browser because the repository is private.
-In the browser, CachedPublicDataServiceProxy caches it and falls back to the bundled copy if everything else fails.
-The controls calculate risk from the snapshot; the boundaries (React components) display it.
+```
+
+- The hourly GitHub Action downloads public datasets, joins them to subzones and publishes one validated snapshot to the private `data` branch.
+- `api/snapshot.ts` serves that snapshot to the browser, because the repository is private.
+- In the browser, `CachedPublicDataServiceProxy` caches it and falls back to the bundled copy if everything else fails.
+- The controls calculate risk from the snapshot; the boundaries (React components) display it.
 
 ## Data pipeline
 
@@ -386,7 +390,7 @@ search now lives in `RiskMapBoundary`.
 | UC-3 View Prevention Guidance | PreventionGuidanceBoundary | PreventionGuidanceControl |
 | UC-4 Simulate Risk Scenario | SimulationBoundary | RiskSimulationControl |
 | UC-5 Identify Planning Subzone | (via UC-1) | LocationRiskControl + GeocodingMapServiceBoundary |
-| Retrieve / Refresh Public Data | (none) | ApprovedPublicDataServiceBoundary: SnapshotDataService, CachedPublicDataServiceProxy |
+| Retrieve / Refresh Public Data (not a use case; covered by NFR-REL and NFR-FRS in the SRS) | (none) | ApprovedPublicDataServiceBoundary: SnapshotDataService, CachedPublicDataServiceProxy |
 
 ## Testing
 
@@ -434,11 +438,11 @@ full suite on GitHub Actions (`.github/workflows/run-tests.yml`, Node 22).
 - Prevention guidance: [NEA](https://www.nea.gov.sg/dengue-zika/prevent-aedes-mosquito-breeding).
 
 ## Reference
-(https://docs.google.com/document/d/1p54W_7tYFbcrcK1JOqbXpyvwVqKzi7mM7uej5McBVsg/edit?usp=sharing)
-The design documents are kept in the team's private Google Doc: DengueAheadSG design document. It holds:
 
-Use case diagram and use case descriptions (UC-1 to UC-5 and their sub-use cases)
-Class diagram
-System architecture diagram
-UI flow
-Control flow graphs: risk level, data confidence and personalised tips
+The design documents are kept in the team's Google Doc: [DengueAheadSG design document](https://docs.google.com/document/d/1p54W_7tYFbcrcK1JOqbXpyvwVqKzi7mM7uej5McBVsg/edit?usp=sharing). It holds:
+
+- Use case diagram and use case descriptions (UC-1 to UC-5 and their sub-use cases)
+- Class diagram
+- System architecture diagram
+- UI flow
+- Control flow graphs: risk level, data confidence and personalised tips
