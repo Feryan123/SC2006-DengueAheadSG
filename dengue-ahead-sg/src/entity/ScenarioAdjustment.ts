@@ -9,7 +9,7 @@
  * - Supply either a preset or an exact value; the simulation control validates it.
  *
  * Relationships:
- * - ScenarioAdjustment 0..* —◆ 1 SimulationScenario (part of a SimulationScenario; multiplicity TODO(verify))
+ * - ScenarioAdjustment 0..* —◆ 1 SimulationScenario (part of a SimulationScenario: SimulationScenario.adjustments)
  */
 
 import type { AdjustableRiskFactorType, AdjustmentLevel } from './enums.ts';

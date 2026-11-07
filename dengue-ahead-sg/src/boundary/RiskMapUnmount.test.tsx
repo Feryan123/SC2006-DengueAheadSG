@@ -1,5 +1,4 @@
-
- // @vitest-environment jsdom
+// @vitest-environment jsdom
 // Ticket #59: Verify Leaflet cleanup when leaving the risk map.
 // jsdom does not reproduce Leaflet's real CSS zoom transition or its
 // delayed 250 ms callback. This is a cleanup regression test, not proof

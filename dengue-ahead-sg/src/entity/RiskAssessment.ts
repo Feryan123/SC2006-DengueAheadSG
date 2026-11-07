@@ -14,8 +14,8 @@
  *
  * Relationships:
  * - RiskAssessment 1 ◆—— 1..* RiskFactorContribution (composition)
- * - RiskAssessment 1 —— 0..* SimulationScenario, role "Baseline Assessment" (multiplicity TODO(verify))
- * - RiskAssessment 1 —— 0..1 SimulationScenario, role "Simulated Assessment" (multiplicity TODO(verify))
+ * - RiskAssessment 1 —— 0..* SimulationScenario, role "Baseline Assessment" (SimulationScenario.baselineAssessmentId is required)
+ * - RiskAssessment 1 —— 0..1 SimulationScenario, role "Simulated Assessment" (SimulationScenario.simulatedAssessmentId is optional)
  * - Created by RiskAssessmentControl (dependency)
  */
 

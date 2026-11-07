@@ -8,10 +8,10 @@
  * - isHypothetical : Boolean — marks the result as hypothetical
  *
  * Relationships:
- * - SimulationScenario 0..* —— 1 RiskAssessment, role "Baseline Assessment" (multiplicity TODO(verify))
- * - SimulationScenario 0..1 —— 1 RiskAssessment, role "Simulated Assessment" (multiplicity TODO(verify))
- * - SimulationScenario 1 ◆—— 0..* ScenarioAdjustment (composition; multiplicity TODO(verify))
- * - Dashed dependency between SimulationScenario and PreventionChecklist (direction/meaning TODO(verify))
+ * - SimulationScenario 0..* —— 1 RiskAssessment, role "Baseline Assessment" (baselineAssessmentId, required)
+ * - SimulationScenario 0..1 —— 1 RiskAssessment, role "Simulated Assessment" (simulatedAssessmentId, optional)
+ * - SimulationScenario 1 ◆—— 0..* ScenarioAdjustment (composition; empty after reset)
+ * - Dashed dependency with PreventionChecklist in the class diagram (no field links them in code)
  */
 
 import type { ScenarioAdjustment } from './ScenarioAdjustment.ts';
@@ -25,6 +25,6 @@ export interface SimulationScenario {
   baselineAssessmentId: string;
   /** "Simulated Assessment" role — 0..1, absent until recalculated */
   simulatedAssessmentId?: string;
-  /** composition ◆—— 0..* — TODO(verify) multiplicity */
+  /** composition ◆—— 0..* (empty after reset) */
   adjustments: ScenarioAdjustment[];
 }

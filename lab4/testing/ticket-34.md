@@ -2,8 +2,8 @@
 
 **Author:** Matin (P2), written as an independent tester of #13 (P3) and #7 (P1). No code from those tickets was changed.
 **Use cases:** UC-1 Assess Location Risk (which consumes the data).
-**Tests:** `src/services/CachedPublicDataServiceProxy.test.ts` (existing, #13) and `src/services/Datapipelinefailuremodes.test.ts` (new, this ticket).
-**How to run:** `npx vitest run src/services/CachedPublicDataServiceProxy.test.ts src/services/Datapipelinefailuremodes.test.ts`
+**Tests:** `src/services/CachedPublicDataServiceProxy.test.ts` (existing, #13) and `src/services/dataPipelineFailureModes.test.ts` (new, this ticket).
+**How to run:** `npx vitest run src/services/CachedPublicDataServiceProxy.test.ts src/services/dataPipelineFailureModes.test.ts`
 **Result:** 2 test files, 48 tests (34 existing + 14 new), all passed on Vitest 5.0.5. No live APIs are used.
 
 ## 1. Failing service triggers the fallback (single-step paths)
@@ -22,7 +22,7 @@ These paths are tested in `src/services/CachedPublicDataServiceProxy.test.ts` (#
 
 ## 2. Fallback output fed into the risk engine (real calculators)
 
-Tests in `src/services/Datapipelinefailuremodes.test.ts`.
+Tests in `src/services/dataPipelineFailureModes.test.ts`.
 
 | ID | Failure injected | Expected output | Test | Actual output | Result |
 |---|---|---|---|---|---|

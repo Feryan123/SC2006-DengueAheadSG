@@ -1,6 +1,6 @@
 /**
  * Traces to: PreventionChecklist (<<entity>>) in class diagram
- * Related use case(s): UC-5 View Prevention Guidance
+ * Related use case(s): UC-3 View Prevention Guidance
  *
  * ATTRIBUTES:
  * - checklistId : String — unique identifier of the checklist
@@ -10,7 +10,7 @@
  *
  * Relationships:
  * - PreventionChecklist 1 ◆—— 1..* PreventionTask (composition)
- * - Dashed dependency with SimulationScenario (direction/meaning TODO(verify))
+ * - Dashed dependency with SimulationScenario in the class diagram (no field links them in code)
  */
 
 import type { PreventionTask } from './PreventionTask.ts';

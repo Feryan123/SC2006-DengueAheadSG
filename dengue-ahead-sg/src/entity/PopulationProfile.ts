@@ -1,6 +1,6 @@
 /**
  * Traces to: PopulationProfile (<<entity>>) in class diagram
- * Related use case(s): UC-1 Assess Location Risk (Generate Risk Assessment — HDB Population / Density Data Source)
+ * Related use case(s): UC-1 Assess Location Risk (Generate Risk Assessment — Census 2020 population data)
  *
  * ATTRIBUTES:
  * - residentCount : Integer — number of residents in the subzone

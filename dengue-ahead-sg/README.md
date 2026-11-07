@@ -245,7 +245,7 @@ and metrics, population profiles, cluster/Aedes records and the national monthly
 public snapshot URL and sends no API key.
 
 Run its checks with `npm test -- --run src/services/CachedPublicDataServiceProxy.test.ts`.
-Failure-mode tests for the whole path are in `src/services/Datapipelinefailuremodes.test.ts`
+Failure-mode tests for the whole path are in `src/services/dataPipelineFailureModes.test.ts`
 (see [`../lab4/testing/ticket-34.md`](../lab4/testing/ticket-34.md)).
 
 ### Bundled backup snapshot
@@ -348,7 +348,7 @@ dengue-ahead-sg/
 ├── scripts/                 data pipeline: sync-data.ts, build-static.ts, sensitivity-analysis.ts, lib/
 ├── tests/                   tests for the api/ functions
 ├── docs/, lab5/             black-box test design, traceability matrix
-├── public/                  logo and icons (+ local latest-snapshot.json, gitignored)
+├── public/                  logo (+ local latest-snapshot.json, gitignored)
 └── src/
     ├── main.tsx             React entry point
     ├── Startup.ts           creates the services and controls shared by the app
@@ -377,9 +377,6 @@ dengue-ahead-sg/
 
 Dependency rule: `boundary → control → entity / services`. Boundaries never call services directly, and controls never
 import React. The scripts in `scripts/` reuse `src/services/` and `src/control/`.
-
-`HomePageBoundary` (the original address-entry screen) is still in the code and tested, but `App` no longer mounts it:
-search now lives in `RiskMapBoundary`.
 
 ### Use cases → files
 

@@ -1,4 +1,3 @@
-
 /**
  * - Create the services and controls shared by the app.
  * - Supply saved backup data when the network and cache cannot provide data.

@@ -1,6 +1,6 @@
 /**
  * Traces to: LocationQuery (<<entity>>) in class diagram
- * Related use case(s): UC-1 Assess Location Risk (Validate Location Query), UC-3 Identify Planning Subzone
+ * Related use case(s): UC-1 Assess Location Risk (Validate Location Query), UC-5 Identify Planning Subzone
  *
  * ATTRIBUTES:
  * - queryText : String — raw address / postal code text entered by the visitor
