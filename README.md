@@ -40,7 +40,9 @@ npm install
 npm run dev                               # open the URL it prints (usually http://localhost:5173)
 ```
 
-All commands below are run inside `dengue-ahead-sg/` (the folder with `package.json`).
+All commands below are run inside `dengue-ahead-sg/` (the folder with `package.json`). File paths in this README such as
+`src/...`, `scripts/...` and `api/...` are also relative to that folder; `lab4/`, `testing/` and `.github/` are at the
+repository root.
 
 | Command | What it does |
 |---|---|
@@ -170,8 +172,8 @@ turned into weights with the **rank-sum** method. All settings live in `src/cont
 - Data counts as stale when a dataset is `STALE` or `FAILED`, or when hourly data was fetched more than 3 hours ago.
 
 The full specification, with the reasons and sources for each choice, excluded factors and limitations, is in
-[`../lab4/risk-model-spec.md`](../lab4/risk-model-spec.md) (#42). How robust the weights are is analysed in
-[`../lab4/sensitivity-analysis.md`](../lab4/sensitivity-analysis.md) (reproduce with `npm run sensitivity`).
+[`lab4/risk-model-spec.md`](lab4/risk-model-spec.md) (#42). How robust the weights are is analysed in
+[`lab4/sensitivity-analysis.md`](lab4/sensitivity-analysis.md) (reproduce with `npm run sensitivity`).
 
 ## OneMap search proxy
 
@@ -217,7 +219,7 @@ npm test -- --run tests/onemap-search.test.ts
 
 The automated tests simulate OneMap replies and do not contact OneMap. A separate local Node.js HTTP check also verified
 real searches, token reuse and renewal after OneMap rejected a test token. Recorded results:
-[ticket #55](../testing/tests/ticket-55.md).
+[ticket #55](testing/tests/ticket-55.md).
 
 Official references: [authentication](https://www.onemap.gov.sg/apidocs/authentication),
 [search](https://www.onemap.gov.sg/apidocs/search),
@@ -247,14 +249,14 @@ public snapshot URL and sends no API key.
 
 Run its checks with `npm test -- --run src/services/CachedPublicDataServiceProxy.test.ts`.
 Failure-mode tests for the whole path are in `src/services/dataPipelineFailureModes.test.ts`
-(see [`../lab4/testing/ticket-34.md`](../lab4/testing/ticket-34.md)).
+(see [`lab4/testing/ticket-34.md`](lab4/testing/ticket-34.md)).
 
 ### Bundled backup snapshot
 
 `src/data/bundled-snapshot.json` is a saved copy of a published snapshot, used only when a request fails and there is no
 usable cache. The hourly pipeline does **not** update it, so it keeps its original date and the app warns that it may be
 old. Refreshing it is optional (worth doing before a release so the fallback is not stale): replace the JSON with a
-validated published snapshot and update the source details. See [`src/data/README.md`](src/data/README.md) for its
+validated published snapshot and update the source details. See [`src/data/README.md`](dengue-ahead-sg/src/data/README.md) for its
 current source commit and the refresh steps.
 
 ### Snapshot hosting
@@ -335,9 +337,18 @@ converts its overlap percentage to that ratio. The simulation runs on a copy of 
 services and controls (`locationControl`, `mapControl`, `preventionControl`, `simulationControl`) and `main.tsx` passes
 them to `App`. `DashboardIcon.tsx` draws small SVG icons without an icon library.
 
-Local check record and diagram follow-ups: [dashboard UI/UX](../testing/tests/ui-dashboard.md).
+Local check record and diagram follow-ups: [dashboard UI/UX](testing/tests/ui-dashboard.md).
 
 ## Project structure
+
+```
+SC2006-DengueAheadSG/
+├── README.md                this file
+├── .github/workflows/       hourly data sync, tests on every pull request
+├── dengue-ahead-sg/         the website (below)
+├── lab4/                    test design, risk model specification, sensitivity analysis
+└── testing/tests/           recorded test results for individual tickets
+```
 
 The code follows the **Entity–Control–Boundary** pattern from our class diagram. Boundary components display the
 dashboard; controls keep the business logic.
@@ -404,12 +415,12 @@ full suite on GitHub Actions (`.github/workflows/run-tests.yml`, Node 22).
 | Where | What it holds |
 |---|---|
 | `src/**/*.test.ts(x)`, `scripts/**/*.test.ts`, `tests/` | Automated tests next to the code they check |
-| [`../testing/tests/`](../testing/tests/) | Recorded results for individual tickets (#13, #19, #20, #22, #32, #55, #57, #58, dashboard UI) |
-| [`../lab4/testing/`](../lab4/testing/) | Lab 4 black-box and white-box test design, and the pipeline failure-mode tests (#34) |
-| [`docs/black-box-test-design.md`](docs/black-box-test-design.md) | Black-box test design for `RiskAssessmentControl` (#25) |
-| [`lab5/traceability-matrix.md`](lab5/traceability-matrix.md) | Requirements → use cases → methods → tests |
-| [`../lab4/risk-model-spec.md`](../lab4/risk-model-spec.md) | Risk model specification: factors, weights, scoring, sources (#42) |
-| [`../lab4/sensitivity-analysis.md`](../lab4/sensitivity-analysis.md) | Risk-weight sensitivity analysis (#35) |
+| [`testing/tests/`](testing/tests/) | Recorded results for individual tickets (#13, #19, #20, #22, #32, #55, #57, #58, dashboard UI) |
+| [`lab4/testing/`](lab4/testing/) | Lab 4 black-box and white-box test design, and the pipeline failure-mode tests (#34) |
+| [`dengue-ahead-sg/docs/black-box-test-design.md`](dengue-ahead-sg/docs/black-box-test-design.md) | Black-box test design for `RiskAssessmentControl` (#25) |
+| [`dengue-ahead-sg/lab5/traceability-matrix.md`](dengue-ahead-sg/lab5/traceability-matrix.md) | Requirements → use cases → methods → tests |
+| [`lab4/risk-model-spec.md`](lab4/risk-model-spec.md) | Risk model specification: factors, weights, scoring, sources (#42) |
+| [`lab4/sensitivity-analysis.md`](lab4/sensitivity-analysis.md) | Risk-weight sensitivity analysis (#35) |
 
 ## Conventions
 
