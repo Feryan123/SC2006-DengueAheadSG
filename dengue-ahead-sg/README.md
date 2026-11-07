@@ -80,7 +80,7 @@ Vite does not run the Vercel functions in `api/`, so two things work differently
 `.env.example` lists the OneMap placeholders. **Never** give a secret a `VITE_*` name: those variables are built into the
 public frontend. `.env*` files are ignored by Git (except `.env.example`).
 
-## How the pieces fit together
+## How data flows through the website
  data.gov.sg datasets
           |
           v
