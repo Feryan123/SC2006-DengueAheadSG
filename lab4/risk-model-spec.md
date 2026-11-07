@@ -333,23 +333,23 @@ Changing any value here changes the model everywhere (map, result, simulation) w
 
 ## References
 
-[6] J. Ong et al., "Mapping dengue risk in Singapore using Random Forest," *PLoS Neglected Tropical Diseases*, vol. 12, no. 6, 2018. https://pubmed.ncbi.nlm.nih.gov/29912940
-[7] W. G. Stillwell, D. A. Seaver and W. Edwards, "A comparison of weight approximation techniques in multiattribute utility decision making," *Organizational Behavior and Human Performance*, vol. 28, no. 1, pp. 62–77, 1981. https://doi.org/10.1016/0030-5073(81)90015-5
-[8] T. Nakase et al., "Population at risk of dengue virus transmission has increased due to coupled climate factors and population growth," *Communications Earth & Environment*, 2024. https://www.nature.com/articles/s43247-024-01639-6
-[9] S. Majeed, W. Akram, M. Sufyan, A. Abbasi, S. Riaz, S. Faisal, M. Binyameen, M. I. Bashir, S. Hassan, S. Zafar, O. Kucher, E. A. Piven and O. D. Kucher, "Climate change: a major factor in the spread of *Aedes aegypti* (Diptera: Culicidae) and its associated dengue virus," *Insects*, vol. 16, no. 5, art. 513, 2025. https://doi.org/10.3390/insects16050513
-[10] F. H. Barron and B. E. Barrett, "Decision quality using ranked attribute weights," *Management Science*, vol. 42, no. 11, pp. 1515–1523, 1996. (Rank order centroid weights.)
-[11] National Environment Agency, dengue clusters, areas with high *Aedes* population and prevention guidance. https://www.nea.gov.sg/dengue-zika
-[12] Team planning and dataset records: Ticket 1 (Sprint 1 planning: risk bands, factor ranking and justifications, weighting source), Ticket 2 (dataset verification, recorded in DengueAheadSG_Datasets_v2.xlsx), and the 22 October feedback-and-plan research (F6, reservoirs).
-[13] W. G. Stillwell and W. Edwards, *Rank Weighting in Multiattribute Utility Decision Making: Avoiding the Pitfalls of Equal Weights*, SSRI Research Report 79-2, Social Science Research Institute, University of Southern California, Sept. 1979. DTIC AD-A078941. https://apps.dtic.mil/sti/tr/pdf/ADA078941.pdf
-[14] E. Roszkowska, "Rank ordering criteria weighting methods – a comparative overview," *Optimum. Studia Ekonomiczne*, no. 5 (65), 2013.
-[15] OECD and European Commission Joint Research Centre, *Handbook on Constructing Composite Indicators: Methodology and User Guide*, OECD Publishing, 2008.
-[16] R. C. Burk and R. M. Nehring, "An empirical comparison of rank-based surrogate weights in additive multiattribute decision analysis," *Decision Analysis*, vol. 20, no. 1, pp. 55–72, 2023. https://doi.org/10.1287/deca.2022.0456
-[17] M. A.-A. Hoque, M. L. Sardar, S. A. Mukul and B. Pradhan, "Mapping dengue susceptibility in Dhaka city: a geospatial multi-criteria approach integrating environmental and demographic factors," *Spatial Information Research*, vol. 33, 2025. https://doi.org/10.1007/s41324-025-00635-y
-[18] US Centers for Disease Control and Prevention, mosquito life cycle (*Aedes aegypti*). https://www.cdc.gov/mosquitoes/
-[19] World Health Organization, "Dengue and severe dengue" fact sheet. https://www.who.int/news-room/fact-sheets/detail/dengue-and-severe-dengue
-[20] Y. L. Hii et al., "Forecast of dengue incidence using temperature and rainfall," *PLoS Neglected Tropical Diseases*, 2012.
-[21] H.-Y. Xu et al., "Statistical modeling reveals the effect of absolute humidity on dengue in Singapore," *PLoS Neglected Tropical Diseases*, 2014.
-[22] H. Gui, S. Gwee, J. Koh, N. Lau and J. Pang, "Weather factors associated with reduced risk of dengue transmission in an urbanized tropical city," *Int. J. Environ. Res. Public Health*, vol. 19, no. 1, art. 339, 2022. https://doi.org/10.3390/ijerph19010339
+[6] J. Ong et al., "Mapping dengue risk in Singapore using Random Forest," *PLoS Neglected Tropical Diseases*, vol. 12, no. 6, 2018. https://pubmed.ncbi.nlm.nih.gov/29912940<br>
+[7] W. G. Stillwell, D. A. Seaver and W. Edwards, "A comparison of weight approximation techniques in multiattribute utility decision making," *Organizational Behavior and Human Performance*, vol. 28, no. 1, pp. 62–77, 1981. https://doi.org/10.1016/0030-5073(81)90015-5<br>
+[8] T. Nakase et al., "Population at risk of dengue virus transmission has increased due to coupled climate factors and population growth," *Communications Earth & Environment*, 2024. https://www.nature.com/articles/s43247-024-01639-6<br>
+[9] S. Majeed, W. Akram, M. Sufyan, A. Abbasi, S. Riaz, S. Faisal, M. Binyameen, M. I. Bashir, S. Hassan, S. Zafar, O. Kucher, E. A. Piven and O. D. Kucher, "Climate change: a major factor in the spread of *Aedes aegypti* (Diptera: Culicidae) and its associated dengue virus," *Insects*, vol. 16, no. 5, art. 513, 2025. https://doi.org/10.3390/insects16050513 <br>
+[10] F. H. Barron and B. E. Barrett, "Decision quality using ranked attribute weights," *Management Science*, vol. 42, no. 11, pp. 1515–1523, 1996. (Rank order centroid weights.) <br>
+[11] National Environment Agency, dengue clusters, areas with high *Aedes* population and prevention guidance. https://www.nea.gov.sg/dengue-zika <br>
+[12] Team planning and dataset records: Ticket 1 (Sprint 1 planning: risk bands, factor ranking and justifications, weighting source), Ticket 2 (dataset verification, recorded in DengueAheadSG_Datasets_v2.xlsx), and the 22 October feedback-and-plan research (F6, reservoirs). <br>
+[13] W. G. Stillwell and W. Edwards, *Rank Weighting in Multiattribute Utility Decision Making: Avoiding the Pitfalls of Equal Weights*, SSRI Research Report 79-2, Social Science Research Institute, University of Southern California, Sept. 1979. DTIC AD-A078941. https://apps.dtic.mil/sti/tr/pdf/ADA078941.pdf <br>
+[14] E. Roszkowska, "Rank ordering criteria weighting methods – a comparative overview," *Optimum. Studia Ekonomiczne*, no. 5 (65), 2013. <br>
+[15] OECD and European Commission Joint Research Centre, *Handbook on Constructing Composite Indicators: Methodology and User Guide*, OECD Publishing, 2008. <br>
+[16] R. C. Burk and R. M. Nehring, "An empirical comparison of rank-based surrogate weights in additive multiattribute decision analysis," *Decision Analysis*, vol. 20, no. 1, pp. 55–72, 2023. https://doi.org/10.1287/deca.2022.0456 <br>
+[17] M. A.-A. Hoque, M. L. Sardar, S. A. Mukul and B. Pradhan, "Mapping dengue susceptibility in Dhaka city: a geospatial multi-criteria approach integrating environmental and demographic factors," *Spatial Information Research*, vol. 33, 2025. https://doi.org/10.1007/s41324-025-00635-y <br>
+[18] US Centers for Disease Control and Prevention, mosquito life cycle (*Aedes aegypti*). https://www.cdc.gov/mosquitoes/ <br>
+[19] World Health Organization, "Dengue and severe dengue" fact sheet. https://www.who.int/news-room/fact-sheets/detail/dengue-and-severe-dengue <br>
+[20] Y. L. Hii et al., "Forecast of dengue incidence using temperature and rainfall," *PLoS Neglected Tropical Diseases*, 2012. <br>
+[21] H.-Y. Xu et al., "Statistical modeling reveals the effect of absolute humidity on dengue in Singapore," *PLoS Neglected Tropical Diseases*, 2014. <br>
+[22] H. Gui, S. Gwee, J. Koh, N. Lau and J. Pang, "Weather factors associated with reduced risk of dengue transmission in an urbanized tropical city," *Int. J. Environ. Res. Public Health*, vol. 19, no. 1, art. 339, 2022. https://doi.org/10.3390/ijerph19010339 <br>
 [23] M. Chan and M. A. Johansson, "The incubation periods of dengue viruses," *PLoS ONE*, vol. 7, no. 11, e50972, 2012. https://doi.org/10.1371/journal.pone.0050972
 
 Reference numbers [6] and [7] match the SRS reference list.
