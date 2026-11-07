@@ -1,4 +1,3 @@
-
 // - Load areas and their supplied risk assessments for the map.
 // - Sort the top areas and factors without calculating risk (UC-2).
 

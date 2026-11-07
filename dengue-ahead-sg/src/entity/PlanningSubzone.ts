@@ -1,6 +1,6 @@
 /**
  * Traces to: PlanningSubzone (<<entity>>) in class diagram
- * Related use case(s): UC-3 Identify Planning Subzone, UC-2 Explore Risk Map, UC-1 Assess Location Risk
+ * Related use case(s): UC-5 Identify Planning Subzone, UC-2 Explore Risk Map, UC-1 Assess Location Risk
  *
  * ATTRIBUTES:
  * - subzoneId : String — unique identifier of the planning subzone
@@ -10,7 +10,7 @@
  * Relationships:
  * - PlanningSubzone 0..1 —— 0..* LocationQuery
  * - PlanningSubzone 1 —— 1 PopulationProfile
- * - PlanningSubzone 1 —— 0..* HighAedesArea (multiplicity TODO(verify))
+ * - PlanningSubzone 1 —— 0..* HighAedesArea (each area is tagged with one subzone; overlap with other subzones is measured in aedesOverlapRatio)
  * - PlanningSubzone 1 —— 0..* DengueCluster
  */
 

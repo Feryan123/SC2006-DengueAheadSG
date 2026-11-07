@@ -56,7 +56,7 @@ All paths are relative to `dengue-ahead-sg/` unless stated otherwise.
 |---|---|---|---|---|---|
 | FR-1.1, FR-1.2 | UC-1 | Dashboard — No Area Selected → Dashboard — Area Selected *(searchOrSelectArea)* / Dashboard — Invalid Location *(submitQuery [invalid location])* | `LocationRiskControl.assessLocation()` | LOC-ECP-01–LOC-ECP-04; LOC-BVA-01–LOC-BVA-04; `src/control/LocationRiskControl.test.ts` | Implemented; tested |
 | FR-5.1 | UC-5 | Dashboard — No Area Selected → Dashboard — Area Selected *(searchOrSelectArea)* | `RiskMapBoundary` search (subzone-name match before geocoding) | `src/App.test.tsx` ("searches local subzone names without calling the address service"); `testing/tests/ui-dashboard.md` | Implemented; tested |
-| FR-5.2, FR-5.3, FR-5.6 | UC-5 (UC-5.1) | Dashboard — No Area Selected → Dashboard — Area Selected / Dashboard — Invalid Location (search service unavailable: see Section 5, item 9) | `GeocodingMapServiceBoundary.geocodeLocation()`; `api/onemap-search.ts` | LOC-ECP-05; `tests/onemap-search.test.ts` | Implemented; tested |
+| FR-5.2, FR-5.3, FR-5.6 | UC-5 (UC-5.1) | Dashboard — No Area Selected → Dashboard — Area Selected / Dashboard — Invalid Location (search service unavailable: see Section 5, item 8) | `GeocodingMapServiceBoundary.geocodeLocation()`; `api/onemap-search.ts` | LOC-ECP-05; `tests/onemap-search.test.ts` | Implemented; tested |
 | FR-5.4, FR-5.5 | UC-5 (UC-5.2) | Dashboard — No Area Selected → Dashboard — Area Selected / Dashboard — Invalid Location | `LocationRiskControl.identifyPlanningSubzone()` | LOC-ECP-01–LOC-ECP-04; LOC-ECP-06; `src/control/LocationRiskControl.test.ts`; `src/services/SubzoneBoundaryService.test.ts` | Implemented; tested |
 | FR-1.3, FR-1.8, FR-1.9 | UC-1 (UC-1.2) | Dashboard — Area Selected; Risk Assessment Unavailable *(selectArea [assessment unavailable])* | `RiskAssessmentControl.generateAssessment()`; `determineDataConfidence()` | RA-ECP-10–RA-ECP-13; DC-P1–DC-P4; DC-X1; DC-X2; `src/control/RiskAssessmentControl.test.ts` | Implemented; tested (DC-X2: known limitation) |
 | FR-1.4, FR-1.7 | UC-1 (UC-1.2) | Dashboard — Area Selected (factor breakdown) | `RiskAssessmentControl.calculateContributions()`; the five `RiskFactorCalculator` classes | RA-ECP-14; FM-RW-01–FM-RW-08; `src/control/calculators/exposureCalculators.test.ts`; `src/control/calculators/weatherCalculators.test.ts` | Implemented; tested |
@@ -97,8 +97,8 @@ All paths are relative to `dengue-ahead-sg/` unless stated otherwise.
 
 | NFR | Supports | Dialog state | Class / file | Test ID / File | Status |
 |---|---|---|---|---|---|
-| NFR-REL.1, NFR-REL.2 | UC-1, UC-2 | Dashboard — No Area Selected; Dashboard — Area Selected (backup notice; see Section 5, item 8) | `CachedPublicDataServiceProxy`; `BundledFallbackNotice`; `Startup.ts` | FM-E2E-01–FM-E2E-03; FM-REC-01; FM-VAL-01–FM-VAL-02; `src/services/CachedPublicDataServiceProxy.test.ts`; `src/services/Datapipelinefailuremodes.test.ts`; `src/Startup.fallback.test.tsx`; `testing/tests/ticket-13.md`, `ticket-58.md` | Implemented; tested |
-| NFR-FRS.2, NFR-SAF.2 | UC-1, UC-2 | Dashboard — No Area Selected; Dashboard — Area Selected (stale-data notice; see Section 5, item 8) | `dataFreshness.ts`; `DataFreshnessNotice` | `src/control/dataFreshness.test.ts`; `src/boundary/DataFreshnessNotice.test.tsx` | Implemented; tested (45-day Aedes rule: known limitation) |
+| NFR-REL.1, NFR-REL.2 | UC-1, UC-2 | Dashboard — No Area Selected; Dashboard — Area Selected (backup notice; see Section 5, item 7) | `CachedPublicDataServiceProxy`; `BundledFallbackNotice`; `Startup.ts` | FM-E2E-01–FM-E2E-03; FM-REC-01; FM-VAL-01–FM-VAL-02; `src/services/CachedPublicDataServiceProxy.test.ts`; `src/services/dataPipelineFailureModes.test.ts`; `src/Startup.fallback.test.tsx`; `testing/tests/ticket-13.md`, `ticket-58.md` | Implemented; tested |
+| NFR-FRS.2, NFR-SAF.2 | UC-1, UC-2 | Dashboard — No Area Selected; Dashboard — Area Selected (stale-data notice; see Section 5, item 7) | `dataFreshness.ts`; `DataFreshnessNotice` | `src/control/dataFreshness.test.ts`; `src/boundary/DataFreshnessNotice.test.tsx` | Implemented; tested (45-day Aedes rule: known limitation) |
 | NFR-FRS.1, NFR-FRS.4 | UC-1, UC-2 | — | `.github/workflows/sync-data.yml`; `scripts/sync-data.ts` | `scripts/sync-data.test.ts` | Implemented; tested (schedule reliability: known limitation) |
 | NFR-SEC.3 | UC-1, UC-5 | — | `api/snapshot.ts`; `api/onemap-search.ts` | `tests/snapshot.test.ts`; `tests/onemap-search.test.ts`; `testing/tests/ticket-55.md` | Implemented; tested |
 | NFR-ACC.1, NFR-USA.2 | All UCs | All states | Boundary components; `style.css` | `testing/tests/ticket-32.md`; `testing/tests/ui-dashboard.md` | Implemented; manual check |
@@ -155,7 +155,7 @@ All are in `src/control/calculators/` and implement the `RiskFactorCalculator` i
 | #12 | Hourly sync job | NFR-FRS.1–FRS.3 | `scripts/sync-data.ts`; `.github/workflows/sync-data.yml`; `sync-data.test.ts` | Done; tested |
 | #13 | Cached service and fallback | NFR-REL.2 | `CachedPublicDataServiceProxy.ts` and its tests; `testing/tests/ticket-13.md` | Done; tested |
 | #14 | OneMap adapter and LocationRiskControl | UC-1, UC-5 / FR-1.1–FR-1.2, FR-5.2–FR-5.6 | `LocationRiskControl.ts`; `GeocodingMapServiceBoundary.ts`; `LocationRiskControl.test.ts` | Done; tested |
-| #15 | Home page wiring | UC-1 / FR-1.1 | Originally `HomePageBoundary.tsx`; replaced by the dashboard search in `RiskMapBoundary` (Sprint 2) | Done; superseded |
+| #15 | Home page wiring | UC-1 / FR-1.1 | Originally `HomePageBoundary.tsx`; replaced by the dashboard search in `RiskMapBoundary` (Sprint 2) and removed in the final clean-up | Done; superseded |
 | #16 | Prevention tip content | UC-3 / FR-3.2, FR-3.5 | `PreventionGuidanceControl.ts` (bundled tasks); `PreventionTasksContent.test.ts` | Done; tested |
 | #17 | Personalised tips | UC-3 / FR-3.1 | `PreventionGuidanceControl.generateTips()`; `PreventionGuidanceControl.generatetips.test.ts` | Done; tested |
 | #18 | RiskResultBoundary redesign | UC-1 / FR-1.3, FR-1.10, FR-1.11 | `RiskResultBoundary.tsx`; `RiskResultBoundary.test.tsx` | Done; tested |
@@ -181,7 +181,7 @@ All are in `src/control/calculators/` and implement the `RiskFactorCalculator` i
 | #30 | Stale-data banner, "Last updated" | NFR-FRS.2, NFR-SAF.2; FR-2.9 | `dataFreshness.ts`; `DataFreshnessNotice.tsx` and their tests | Done; tested |
 | #31 | Prevention page with NEA links | UC-3 / FR-3.4 | `PreventionGuidanceBoundary.tsx` and its test | Done; tested |
 | #32 | Keyboard access and phone layout | NFR-ACC.1, NFR-USA.2 | `testing/tests/ticket-32.md` | Done; manual check |
-| #34 | Failure-mode tests for the data pipeline | NFR-REL | `lab4/testing/ticket-34.md`; `Datapipelinefailuremodes.test.ts` | Done; tested |
+| #34 | Failure-mode tests for the data pipeline | NFR-REL | `lab4/testing/ticket-34.md`; `dataPipelineFailureModes.test.ts` | Done; tested |
 | #35 | Sensitivity analysis of the weights | FR-1.4; NFR-MNT.1 | `lab4/sensitivity-analysis.md`; `scripts/sensitivity-analysis.ts`; `weightSchemes.test.ts` | Done; tested |
 | #37 | Test case design for every control | All UCs | `lab4/testing/test-design.md` | Done |
 | #41 | Execute tests and record actual outputs | All UCs | Section 4.3; actual outputs in `test-design.md` and `ticket-34.md` | Done |
@@ -204,8 +204,8 @@ All are in `src/control/calculators/` and implement the `RiskFactorCalculator` i
 | Map | `src/control/RiskMapControl.test.ts`; `src/boundary/RiskMapBoundary.test.tsx`; `src/boundary/RiskMapUnmount.test.tsx`; `src/control/clustersForSubzone.test.ts` |
 | Prevention | `src/control/PreventionGuidanceControl.test.ts`; `src/control/PreventionGuidanceControl.generatetips.test.ts`; `src/control/PreventionTasksContent.test.ts`; `src/boundary/PreventionGuidanceBoundary.test.tsx`; `src/boundary/PreventionHeadings.test.tsx` |
 | Simulation | `src/control/RiskSimulationControl.test.ts`; `src/boundary/SimulationBoundary.test.tsx` |
-| Result and app | `src/boundary/RiskResultBoundary.test.tsx`; `src/App.test.tsx`; `src/Startup.test.ts`; `src/Startup.fallback.test.tsx`; `src/boundary/HomePageBoundary.test.tsx` |
-| Data and freshness | `src/services/CachedPublicDataServiceProxy.test.ts`; `src/services/Datapipelinefailuremodes.test.ts`; `src/control/dataFreshness.test.ts`; `src/boundary/DataFreshnessNotice.test.tsx`; `tests/snapshot.test.ts` |
+| Result and app | `src/boundary/RiskResultBoundary.test.tsx`; `src/App.test.tsx`; `src/Startup.test.ts`; `src/Startup.fallback.test.tsx` |
+| Data and freshness | `src/services/CachedPublicDataServiceProxy.test.ts`; `src/services/dataPipelineFailureModes.test.ts`; `src/control/dataFreshness.test.ts`; `src/boundary/DataFreshnessNotice.test.tsx`; `tests/snapshot.test.ts` |
 | Pipeline scripts | `scripts/sync-data.test.ts`; `scripts/lib/baselines.test.ts`; `scripts/lib/census.test.ts`; `scripts/lib/subzone.output.test.ts`; `scripts/lib/weightSchemes.test.ts` |
 
 ### 4.2 Manual test records
@@ -237,10 +237,9 @@ These were found by testing and are recorded rather than fixed, because the code
 3. **FM-VAL-02 (sync job):** a dengue cluster without a locality would make the published snapshot fail browser validation, so visitors would see the backup data. It doesn't occur in current data.
 4. **NFR-FRS.2:** the 45-day high-Aedes age rule is defined in `riskModelConfig.ts` but not applied.
 5. **NFR-FRS.1:** GitHub Actions does not always start the hourly run on time; the refresh can be triggered by hand (NFR-FRS.4).
-6. **Unused classes:** `HomePageBoundary`, `DataUnavailableBoundary` and `SubzonePopup` remain in `src/boundary/` from Sprint 1 but are not used by the dashboard. They are left out of the class diagram and will be removed in the final clean-up.
-7. **Top-10 list:** the highest-risk list (`getTopSubzones()`) has no FR of its own in the SRS.
-8. **Dialog map — stale or backup data:** the app shows a stale-data notice and a backup-data notice (NFR-FRS.2, NFR-SAF.2, NFR-REL.2) inside the dashboard states, but the dialog map has no separate state or activity for them.
-9. **Dialog map — search service unavailable:** when OneMap cannot be reached, the app shows "Location search is unavailable" (FR-5.6). The dialog map does not show this separately from Dashboard — Invalid Location.
+6. **Top-10 list:** the highest-risk list (`getTopSubzones()`) has no FR of its own in the SRS.
+7. **Dialog map — stale or backup data:** the app shows a stale-data notice and a backup-data notice (NFR-FRS.2, NFR-SAF.2, NFR-REL.2) inside the dashboard states, but the dialog map has no separate state or activity for them.
+8. **Dialog map — search service unavailable:** when OneMap cannot be reached, the app shows "Location search is unavailable" (FR-5.6). The dialog map does not show this separately from Dashboard — Invalid Location.
 
 ## 6. Lab 5 Demonstration Trace Examples
 

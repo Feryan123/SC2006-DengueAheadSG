@@ -25,7 +25,7 @@ The tests verify externally observable behaviour, including risk classification,
 | ECP-13 | -1 | Low | Out-of-range input below 0 |
 | ECP-14 | 101 | Very High | Out-of-range input above 100 |
 
-**Note:** `determineRiskLevel()` classifies the supplied number without validating its range. ECP-13 and ECP-14 document the current implementation behaviour, not an input-rejection requirement. These two inputs are not covered by separate automated tests.
+**Note:** `determineRiskLevel()` classifies the supplied number without validating its range. ECP-13 and ECP-14 document the current implementation behaviour, not an input-rejection requirement. Both inputs are now covered by the automated `determineRiskLevel` tests.
 
 ### 2.2 Assessment Generation
 
@@ -109,7 +109,7 @@ For parameterized tests, the automated test name uses the actual input and expec
 | BVA-13 | `determineContributionLevel`: `0 → Low` | Direct |
 | BVA-14 | `determineContributionLevel`: `100 → High` | Direct |
 
-**Coverage clarification:** ECP-01, ECP-02 and ECP-04 represent valid equivalence classes, but their exact representative inputs are not separate automated cases. The classification bands are exercised by parameterized boundary tests. ECP-13 and ECP-14 are documented behaviours requiring additional tests if direct automated coverage is desired.
+**Coverage clarification:** The exact representative inputs of ECP-01 to ECP-04 (10, 35, 60, 85) and ECP-13/ECP-14 (−1, 101) are all included in the parameterized `determineRiskLevel` tests, alongside the boundary values.
 
 ## 5. Test Execution and Results
 

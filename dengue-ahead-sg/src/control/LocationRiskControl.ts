@@ -8,7 +8,7 @@
  * - handleUnavailableData() — handle an invalid location or missing assessment data
  *
  * Relationships (dependencies):
- * - Called by HomePageBoundary, RiskResultBoundary
+ * - Called by RiskMapBoundary (dashboard search)
  * - Uses GeocodingMapServiceBoundary, ApprovedPublicDataServiceBoundary, RiskAssessmentControl
  * - Reads/writes LocationQuery, PlanningSubzone
  */
