@@ -24,7 +24,7 @@ records. It was generated on 30 October 2026 at 5:16 pm Singapore time.
 
 ## Source and updates
 
-- [Published pipeline snapshot](https://github.com/Feryan123/SC2006-DengueAheadSG/blob/84e2bb51663bf930d4dd0939c178d6f652762fb3/dengue-ahead-sg/data/derived/latest-snapshot.json).
+- [Published pipeline snapshot](https://github.com/Feryan123/SC2006-DengueAheadSG/blob/84e2bb51663bf930d4dd0939c178d6f652762fb3/dengue-ahead-sg/data/derived/latest-snapshot.json) (team repository, private).
 - Source commit: `84e2bb51663bf930d4dd0939c178d6f652762fb3`.
 - Git blob SHA-1: `028821938193254f6c7db9b0051c4f3772691934`.
 - Size: 6,420,926 bytes. The file is an unchanged copy of the published snapshot.

@@ -226,7 +226,7 @@ At the repository root, `testing/tests/` holds feature test tables with actual r
 | Merge | PR #51 merged into `master` (merge commit `0be82fa`) |
 | Additional check | 446/446 also passed on a clean copy of `master` |
 
-Evidence: [PR #51](https://github.com/Feryan123/SC2006-DengueAheadSG/pull/51) and its GitHub Actions log. This automated suite is separate from the 120 designed test cases in Section 2.6.
+Evidence: [PR #51](https://github.com/Feryan123/SC2006-DengueAheadSG/pull/51) in the team repository (private) and its GitHub Actions log. This automated suite is separate from the 120 designed test cases in Section 2.6.
 
 ## 5. Known Limitations
 
