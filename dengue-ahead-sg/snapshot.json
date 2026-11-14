@@ -1,0 +1,14 @@
+{
+    "generatedAt": "2026-11-14T17:07:41.546Z",
+    "staticData": {
+        "ds2020PopulationDensity": "data/static/ds2020PopulationDensity.json",
+        "subzonesBoundary": "data/static/subzonesBoundary.json"
+    },
+    "dynamicData": {
+        "dengueClusters": "data/dynamic/dengueClusters.json",
+        "highAedesAreas": "data/dynamic/highAedesAreas.json",
+        "rainfallMonthly": "data/dynamic/rainfallMonthly.json",
+        "relativeHumidityMonthly": "data/dynamic/relativeHumidityMonthly.json"
+    },
+    "realtime": {}
+}
